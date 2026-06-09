@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Quiz Generator & Evaluator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+        body.dark { background: #1a1a2e; }
+        .container {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            transition: background 0.3s, color 0.3s;
+        }
+        body.dark .container { background: #16213e; color: #eaeaea; }
+        h1 { text-align: center; margin-bottom: 30px; color: #1a1a2e; font-size: 28px; }
+        body.dark h1 { color: #eaeaea; }
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .file-drop-zone {
+            border: 2px dashed #4a90d9;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s;
+            margin-bottom: 20px;
+        }
+        .file-drop-zone:hover { background: #f0f8ff; border-color: #2d6cdf; }
+        body.dark .file-drop-zone { border-color: #6ea9e6; background: #0f3460; }
+        body.dark .file-drop-zone:hover { background: #1a3d66; }
+        .file-drop-zone input { display: none; }
+        .file-drop-zone p { color: #666; margin: 10px 0; }
+        body.dark .file-drop-zone p { color: #aaa; }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        body.dark textarea { background: #0f3460; border-color: #3a3a5c; color: #eaeaea; }
+        .btn {
+            background: #4a90d9;
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+            transition: background 0.3s, transform 0.1s;
+        }
+        .btn:hover { background: #2d6cdf; }
+        .btn:active { transform: scale(0.98); }
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner.active { display: block; }
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #4a90d9;
+        }
+        .question-text { font-size: 20px; margin-bottom: 25px; line-height: 1.5; }
+        .options { display: grid; gap: 12px; }
+        .option-btn {
+            background: #f0f0f0;
+            border: 2px solid transparent;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+            font-size: 15px;
+        }
+        body.dark .option-btn { background: #3a3a5c; color: #eaeaea; }
+        .option-btn:hover { background: #e0e0e0; border-color: #4a90d9; }
+        body.dark .option-btn:hover { background: #4a4a6d; }
+        .option-btn.selected { background: #4a90d9; color: white; border-color: #2d6cdf; }
+        .nav-btns { display: flex; gap: 10px; margin-top: 25px; }
+        .btn-next { flex: 1; }
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4a90d9;
+            transition: width 0.3s ease;
+        }
+        .results-scroll { max-height: 400px; overflow-y: auto; padding-right: 10px; }
+        .result-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        body.dark .result-item { background: #0f3460; }
+        .result-question { font-weight: 600; margin-bottom: 10px; }
+        .user-answer.wrong { color: #e74c3c; }
+        .user-answer.correct { color: #27ae60; }
+        .correct-answer { color: #27ae60; font-weight: 600; margin-top: 8px; }
+        .explanation { color: #666; font-size: 13px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+        body.dark .explanation { color: #aaa; border-top-color: #3a3a5c; }
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        body.dark .theme-toggle { background: #3a3a5c; border-color: #4a4a6d; }
+        .score-display { text-align: center; font-size: 36px; margin-bottom: 30px; color: #1a1a2e; }
+        body.dark .score-display { color: #eaeaea; }
+        .count-input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        body.dark .count-input { background: #0f3460; border-color: #3a3a5c; color: #eaeaea; }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+    <div class="container">
+        <h1>AI Quiz Generator</h1>
+        
+        <!-- Upload State -->
+        <div class="view active" id="uploadView">
+            <form id="uploadForm">
+                <div class="file-drop-zone" id="dropZone">
+                    <p>📁 Drag & Drop file here or click to browse</p>
+                    <p style="font-size:12px; color:#999;">Supported: PDF, PNG, JPG, TXT, CSV</p>
+                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.txt,.csv">
+                </div>
+                <p style="margin-bottom:10px;">Or paste text directly:</p>
+                <textarea id="textInput" placeholder="Enter your text content here..."></textarea>
+                <div style="margin: 15px 0;">
+                    <label>Number of questions: <input type="number" id="numQuestions" class="count-input" min="1" max="20" value="10"></label>
+                </div>
+                <div style="position:relative;">
+                    <button type="submit" class="btn" id="generateBtn">Generate Quiz</button>
+                    <div class="spinner" id="spinner"></div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Quiz State -->
+        <div class="view" id="quizView">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="question-header">
+                <span id="progressText">Question 1 of 10</span>
+                <button class="btn" id="submitQuiz" style="width:auto; padding:8px 16px; font-size:14px;">Submit Quiz</button>
+            </div>
+            <div class="question-text" id="questionText"></div>
+            <div class="options" id="optionsContainer"></div>
+            <div class="nav-btns">
+                <button class="btn btn-next" id="nextBtn">Next</button>
+            </div>
+        </div>
+        
+        <!-- Results State -->
+        <div class="view" id="resultsView">
+            <div class="score-display" id="scoreDisplay">Score: 0/0</div>
+            <div class="results-scroll" id="resultsContainer"></div>
+            <button class="btn" id="restartBtn" style="margin-top:20px;">Generate New Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            questions: [],
+            currentIndex: 0,
+            userAnswers: [],
+            isDark: localStorage.getItem('dark') === 'true'
+        };
+
+        const views = { upload: document.getElementById('uploadView'), quiz: document.getElementById('quizView'), results: document.getElementById('resultsView') };
+        const elements = {
+            dropZone: document.getElementById('dropZone'), fileInput: document.getElementById('fileInput'),
+            textInput: document.getElementById('textInput'), generateBtn: document.getElementById('generateBtn'),
+            spinner: document.getElementById('spinner'), questionText: document.getElementById('questionText'),
+            optionsContainer: document.getElementById('optionsContainer'), nextBtn: document.getElementById('nextBtn'),
+            submitQuiz: document.getElementById('submitQuiz'), progressText: document.getElementById('progressText'),
+            progressFill: document.getElementById('progressFill'), resultsContainer: document.getElementById('resultsContainer'),
+            scoreDisplay: document.getElementById('scoreDisplay'), restartBtn: document.getElementById('restartBtn'),
+            themeToggle: document.getElementById('themeToggle')
+        };
+
+        // Theme toggle
+        elements.themeToggle.addEventListener('click', () => {
+            state.isDark = !state.isDark;
+            document.body.classList.toggle('dark', state.isDark);
+            elements.themeToggle.textContent = state.isDark ? '☀️' : '🌙';
+            localStorage.setItem('dark', state.isDark);
+        });
+        if (state.isDark) { document.body.classList.add('dark'); elements.themeToggle.textContent = '☀️'; }
+
+        // File upload handlers
+        elements.dropZone.addEventListener('click', () => elements.fileInput.click());
+        elements.dropZone.addEventListener('dragover', e => { e.preventDefault(); elements.dropZone.style.borderColor = '#2d6cdf'; });
+        elements.dropZone.addEventListener('dragleave', e => { e.preventDefault(); elements.dropZone.style.borderColor = ''; });
+        elements.dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            elements.dropZone.style.borderColor = '';
+            if (e.dataTransfer.files[0]) { elements.fileInput.files = e.dataTransfer.files; }
+        });
+
+        // Generate quiz
+        elements.generateBtn.addEventListener('click', handleGenerate);
+        document.getElementById('uploadForm').addEventListener('submit', e => { e.preventDefault(); handleGenerate(); });
+
+        async function handleGenerate() {
+            const file = elements.fileInput.files[0];
+            const text = elements.textInput.value.trim();
+            const numQuestions = document.getElementById('numQuestions').value;
+
+            if (!file && !text) return alert('Please provide a file or text');
+
+            elements.generateBtn.style.display = 'none';
+            elements.spinner.classList.add('active');
+
+            try {
+                const formData = new FormData();
+                if (file) formData.append('file', file);
+                if (text) formData.append('text', text);
+                formData.append('num_questions', numQuestions);
+
+                const res = await fetch('/generate-quiz', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Failed to generate quiz');
+                
+                state.questions = Array.isArray(data) ? data : (typeof data === 'string' ? JSON.parse(data) : data);
+                state.currentIndex = 0;
+                state.userAnswers = new Array(state.questions.length).fill(null);
+                showView('quiz');
+                renderQuestion();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                elements.generateBtn.style.display = 'block';
+                elements.spinner.classList.remove('active');
+            }
+        }
+
+        function showView(viewName) {
+            Object.values(views).forEach(v => v.classList.remove('active'));
+            views[viewName].classList.add('active');
+        }
+
+        function renderQuestion() {
+            const q = state.questions[state.currentIndex];
+            elements.questionText.textContent = q.question;
+            elements.progressText.textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
+            elements.progressFill.style.width = `${(state.currentIndex + 1) / state.questions.length * 100}%`;
+            elements.optionsContainer.innerHTML = q.options.map((opt, i) => `
+                <button class="option-btn" data-index="${i}">${opt}</button>
+            `.join(''));
+            
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.classList.toggle('selected', state.userAnswers[state.currentIndex] === parseInt(btn.dataset.index));
+                btn.onclick = () => selectOption(parseInt(btn.dataset.index));
+            });
+        }
+
+        function selectOption(index) {
+            state.userAnswers[state.currentIndex] = index;
+            document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('selected'));
+            const clickedBtn = event.target.closest('.option-btn');
+            if (clickedBtn) clickedBtn.classList.add('selected');
+        }
+
+        elements.nextBtn.onclick = () => {
+            if (state.userAnswers[state.currentIndex] === null) return alert('Please select an option');
+            if (state.currentIndex < state.questions.length - 1) {
+                state.currentIndex++;
+                renderQuestion();
+            }
+        };
+
+        elements.submitQuiz.onclick = () => {
+            showResults();
+        };
+
+        function showResults() {
+            const score = state.userAnswers.reduce((sum, ans, i) => 
+                ans === state.questions[i].correct_index ? sum + 1 : sum, 0);
+            elements.scoreDisplay.textContent = `Score: ${score}/${state.questions.length}`;
+            
+            elements.resultsContainer.innerHTML = state.questions.map((q, i) => {
+                const userAns = state.userAnswers[i];
+                const isCorrect = userAns === q.correct_index;
+                return `
+                    <div class="result-item">
+                        <div class="result-question">${i + 1}. ${q.question}</div>
+                        <div class="user-answer ${userAns === null ? 'skipped' : isCorrect ? 'correct' : 'wrong'}">
+                            Your answer: ${userAns === null ? 'Skipped' : q.options[userAns]}
+                        </div>
+                        <div class="correct-answer">Correct: ${q.options[q.correct_index]}</div>
+                        <div class="explanation">${q.explanation}</div>
+                    </div>
+                `;
+            }).join('');
+            showView('results');
+        }
+
+        elements.restartBtn.onclick = () => {
+            state.questions = [];
+            state.currentIndex = 0;
+            state.userAnswers = [];
+            elements.fileInput.value = '';
+            elements.textInput.value = '';
+            showView('upload');
+        };
+    </script>
+</body>
+</html>
