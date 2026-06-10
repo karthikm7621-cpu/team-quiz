@@ -271,11 +271,25 @@
                 formData.append('num_questions', numQuestions);
 
                 const res = await fetch('/generate-quiz', { method: 'POST', body: formData });
-                const data = await res.json();
                 
-                if (!res.ok) throw new Error(data.error || 'Failed to generate quiz');
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error("Server returned an error page:", errorText);
+                    throw new Error(`Server error: ${res.status}`);
+                }
                 
-                state.questions = Array.isArray(data) ? data : (typeof data === 'string' ? JSON.parse(data) : data);
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    const responseText = await res.text();
+                    console.error("Failed to parse JSON response:", responseText);
+                    throw new Error('Invalid server response format');
+                }
+                
+                if (data.status === 'error') throw new Error(data.message || 'Failed to generate quiz');
+                
+                state.questions = Array.isArray(data.questions) ? data.questions : (typeof data.questions === 'string' ? JSON.parse(data.questions) : data.questions);
                 state.currentIndex = 0;
                 state.userAnswers = new Array(state.questions.length).fill(null);
                 showView('quiz');
