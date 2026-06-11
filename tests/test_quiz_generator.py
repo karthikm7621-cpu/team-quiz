@@ -34,4 +34,10 @@ def test_generate_quiz_locally() -> None:
     for q in questions:
         assert "points" in q
         assert 1 <= q["points"] <= 3
-        assert q["type"] in ("MCQ", "Very Short Answer", "Short Answer", "Long Answer", "Essay")
+        assert q["type"] in (
+            "MCQ",
+            "Very Short Answer",
+            "Short Answer",
+            "Long Answer",
+            "Essay",
+        )

@@ -164,7 +164,7 @@ def extract_text_from_file(file_content: bytes, filename: str) -> str:
     try:
         return extract_text_from_txt(file_content)
     except Exception:
-        pass # nosec B110
+        pass  # nosec B110
 
     raise ValueError(f"Unable to extract text from .{ext} files in local mode")
 
@@ -189,7 +189,9 @@ def _pick_sentences(sentences: list[str], count: int = 1) -> list[str]:
     return random.sample(sentences, min(count, len(sentences)))  # nosec B311
 
 
-def _make_mcq(sentence: str, difficulty: str, answer_length: str, points: int) -> tuple[str, list[str], int]:
+def _make_mcq(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> tuple[str, list[str], int]:
     word = _pick_keyword(sentence)
     wrong = _pick_wrong_options([sentence], word)
     if len(wrong) < 3:
