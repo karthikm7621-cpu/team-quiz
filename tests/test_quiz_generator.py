@@ -3,7 +3,7 @@ from quiz_generator import (
     allowed_file,
     extract_text_from_csv,
     extract_text_from_txt,
-    build_quiz_prompt,
+    generate_quiz_locally,
 )
 
 
@@ -27,7 +27,12 @@ def test_extract_text_from_csv():
     assert 'Bob 85' in output
 
 
-def test_build_quiz_prompt():
-    prompt = build_quiz_prompt('Sample text', 5)
-    assert 'Generate 5 multiple-choice quiz questions' in prompt
-    assert 'Sample text' in prompt
+def test_generate_quiz_locally():
+    text = 'Python is a programming language. It was created by Guido van Rossum. Python supports multiple programming paradigms and is widely used.'
+    questions = generate_quiz_locally(text, 3)
+    assert len(questions) >= 1
+    assert len(questions) <= 3
+    for q in questions:
+        assert 'points' in q
+        assert 1 <= q['points'] <= 3
+        assert q['type'] in ('mcq', 'very_short_answer', 'short_answer', 'long_answer')
