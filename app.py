@@ -1,45 +1,48 @@
 import streamlit as st
 from dotenv import load_dotenv
+
 from quiz_generator import (
     allowed_file,
     extract_text_from_file,
     generate_quiz,
     generate_ai_quiz,
+    ALLOWED_EXTENSIONS,
 )
 
 load_dotenv()
 
 st.set_page_config(
-    page_title='Team Quiz',
-    page_icon='🧠',
-    layout='centered',
-    initial_sidebar_state='collapsed'
+    page_title="Team Quiz",
+    page_icon="🧠",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-if 'questions' not in st.session_state:
+if "questions" not in st.session_state:
     st.session_state.questions = []
-if 'current_index' not in st.session_state:
+if "current_index" not in st.session_state:
     st.session_state.current_index = 0
-if 'user_answers' not in st.session_state:
+if "user_answers" not in st.session_state:
     st.session_state.user_answers = []
-if 'quiz_submitted' not in st.session_state:
+if "quiz_submitted" not in st.session_state:
     st.session_state.quiz_submitted = False
-if 'show_quiz' not in st.session_state:
+if "show_quiz" not in st.session_state:
     st.session_state.show_quiz = False
-if 'show_answers' not in st.session_state:
+if "show_answers" not in st.session_state:
     st.session_state.show_answers = False
-if 'question_type' not in st.session_state:
-    st.session_state.question_type = 'MCQ'
-if 'difficulty' not in st.session_state:
-    st.session_state.difficulty = 'Basic'
-if 'answer_length' not in st.session_state:
-    st.session_state.answer_length = '1-line'
-if 'mode' not in st.session_state:
-    st.session_state.mode = 'Local'
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = ''
+if "question_type" not in st.session_state:
+    st.session_state.question_type = "MCQ"
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "Basic"
+if "answer_length" not in st.session_state:
+    st.session_state.answer_length = "1-line"
+if "mode" not in st.session_state:
+    st.session_state.mode = "Local"
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -286,10 +289,12 @@ st.markdown("""
     padding: 20px;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
-def reset_quiz():
+def reset_quiz() -> None:
     st.session_state.questions = []
     st.session_state.current_index = 0
     st.session_state.user_answers = []
@@ -300,16 +305,16 @@ def reset_quiz():
 
 def type_badge(q_type: str) -> str:
     badge_class = {
-        'MCQ': 'badge-mcq',
-        'Very Short Answer': 'badge-very-short',
-        'Short Answer': 'badge-short',
-        'Long Answer': 'badge-long',
-        'Essay': 'badge-essay',
-    }.get(q_type, 'badge-mcq')
+        "MCQ": "badge-mcq",
+        "Very Short Answer": "badge-very-short",
+        "Short Answer": "badge-short",
+        "Long Answer": "badge-long",
+        "Essay": "badge-essay",
+    }.get(q_type, "badge-mcq")
     return f'<span class="{badge_class}">{q_type}</span>'
 
 
-def render_quiz():
+def render_quiz() -> None:
     questions = st.session_state.questions
     current_index = st.session_state.current_index
     user_answers = st.session_state.user_answers
@@ -317,228 +322,352 @@ def render_quiz():
     show_answers = st.session_state.show_answers
 
     q = questions[current_index]
-    q_type = q.get('type', '')
-    points = q.get('points', 1)
+    q_type = q.get("type", "")
+    points = q.get("points", 1)
 
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
     st.markdown('<h2 class="title-gradient">🧠 Team Quiz</h2>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="question-card">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.markdown(f'<div class="points-badge">🏆 {points} Mark{"s" if points > 1 else ""}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="points-badge">🏆 {points} Mark{"s" if points > 1 else ""}</div>',
+            unsafe_allow_html=True,
+        )
     with col2:
         st.markdown(type_badge(q_type), unsafe_allow_html=True)
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown(f'<p style="color:#e2e8f0; font-size:16px; font-weight:500;">Q{current_index + 1}. {q["question"]}</p>', unsafe_allow_html=True)
+    st.markdown(
+        f'<p style="color:#e2e8f0; font-size:16px; font-weight:500;">Q{current_index + 1}. {q["question"]}</p>',
+        unsafe_allow_html=True,
+    )
 
     if submitted or show_answers:
-        if q_type == 'MCQ':
-            for i, option in enumerate(q['options']):
-                correct = i == q['correct_index']
+        if q_type == "MCQ":
+            for i, option in enumerate(q["options"]):
+                correct = i == q["correct_index"]
                 chosen = user_answers[current_index] == i
                 if correct:
-                    st.markdown(f'<div class="correct-answer">✅ <strong>{option}</strong></div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div class="correct-answer">✅ <strong>{option}</strong></div>',
+                        unsafe_allow_html=True,
+                    )
                 elif chosen:
-                    st.markdown(f'<div style="opacity:0.6; padding:8px;">❌ {option}</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div style="opacity:0.6; padding:8px;">❌ {option}</div>',
+                        unsafe_allow_html=True,
+                    )
                 else:
-                    st.markdown(f'<div style="opacity:0.4; padding:8px;">▫️ {option}</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div style="opacity:0.4; padding:8px;">▫️ {option}</div>',
+                        unsafe_allow_html=True,
+                    )
         else:
-            answer_display = user_answers[current_index] if user_answers[current_index] else "Not answered"
-            st.markdown(f'<div style="background:rgba(255,255,255,0.08); padding:12px; border-radius:10px; margin:8px 0;"><strong>Your answer:</strong> {answer_display}</div>', unsafe_allow_html=True)
+            answer_display = (
+                user_answers[current_index]
+                if user_answers[current_index]
+                else "Not answered"
+            )
+            st.markdown(
+                f'<div style="background:rgba(255,255,255,0.08); padding:12px; border-radius:10px; margin:8px 0;"><strong>Your answer:</strong> {answer_display}</div>',
+                unsafe_allow_html=True,
+            )
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="answer-box"><strong>✅ Answer:</strong><br>' + str(q["answer"]).replace('\n', '<br>') + '</div>', unsafe_allow_html=True)
-        st.caption(f'💡 {q["explanation"]}')
+        st.markdown(
+            '<div class="answer-box"><strong>✅ Answer:</strong><br>'
+            + str(q["answer"]).replace("\n", "<br>")
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"💡 {q['explanation']}")
     else:
-        if q_type == 'MCQ':
-            options = q.get('options', [])
+        if q_type == "MCQ":
+            options = q.get("options", [])
             cols = st.columns(2)
             for i, option in enumerate(options):
                 with cols[i % 2]:
-                    if st.button(option, key=f"opt_{i}_{current_index}", use_container_width=True):
+                    if st.button(
+                        option, key=f"opt_{i}_{current_index}", use_container_width=True
+                    ):
                         st.session_state.user_answers[current_index] = i
                         st.rerun()
 
             if user_answers[current_index] is None:
-                st.caption('👆 Select an answer to continue')
-        elif q_type in ('Very Short Answer', 'Short Answer'):
-            user_input = st.text_input('Type your answer', key=f'short_{current_index}', label_visibility='collapsed', placeholder='Type your answer here...')
-            if st.button('Submit Answer', key=f'submit_short_{current_index}', use_container_width=True):
+                st.caption("👆 Select an answer to continue")
+        elif q_type in ("Very Short Answer", "Short Answer"):
+            user_input = st.text_input(
+                "Type your answer",
+                key=f"short_{current_index}",
+                label_visibility="collapsed",
+                placeholder="Type your answer here...",
+            )
+            if st.button(
+                "Submit Answer",
+                key=f"submit_short_{current_index}",
+                use_container_width=True,
+            ):
                 st.session_state.user_answers[current_index] = user_input
                 st.rerun()
             if user_answers[current_index] is None:
-                st.caption('✍️ Type your answer and click Submit Answer')
+                st.caption("✍️ Type your answer and click Submit Answer")
         else:
-            user_input = st.text_area('Type your answer', key=f'long_{current_index}', label_visibility='collapsed', height=150, placeholder='Type your detailed answer here...')
-            if st.button('Submit Answer', key=f'submit_long_{current_index}', use_container_width=True):
+            user_input = st.text_area(
+                "Type your answer",
+                key=f"long_{current_index}",
+                label_visibility="collapsed",
+                height=150,
+                placeholder="Type your detailed answer here...",
+            )
+            if st.button(
+                "Submit Answer",
+                key=f"submit_long_{current_index}",
+                use_container_width=True,
+            ):
                 st.session_state.user_answers[current_index] = user_input
                 st.rerun()
             if user_answers[current_index] is None:
-                st.caption('✍️ Type your answer and click Submit Answer')
+                st.caption("✍️ Type your answer and click Submit Answer")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div style="display:flex; gap:12px; margin-top:20px;">', unsafe_allow_html=True)
+    st.markdown(
+        '<div style="display:flex; gap:12px; margin-top:20px;">', unsafe_allow_html=True
+    )
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if current_index > 0 and st.button('⬅️ Previous', use_container_width=True):
+        if current_index > 0 and st.button("⬅️ Previous", use_container_width=True):
             st.session_state.current_index -= 1
             st.rerun()
     with col2:
-        if current_index < len(questions) - 1 and st.button('Next ➡️', use_container_width=True):
+        if current_index < len(questions) - 1 and st.button(
+            "Next ➡️", use_container_width=True
+        ):
             st.session_state.current_index += 1
             st.rerun()
     with col3:
-        if not submitted and st.button('📝 Submit Quiz', use_container_width=True):
-            unanswered = [i + 1 for i, a in enumerate(user_answers) if a is None or (isinstance(a, str) and a.strip() == '')]
+        if not submitted and st.button("📝 Submit Quiz", use_container_width=True):
+            unanswered = [
+                i + 1
+                for i, a in enumerate(user_answers)
+                if a is None or (isinstance(a, str) and a.strip() == "")
+            ]
             if unanswered:
-                st.warning(f'⚠️ Unanswered question(s): {unanswered}')
+                st.warning(f"⚠️ Unanswered question(s): {unanswered}")
             else:
                 st.session_state.quiz_submitted = True
                 st.rerun()
     with col4:
-        if st.button('👁️ Show Answers' if not show_answers else '🙈 Hide Answers', use_container_width=True):
+        if st.button(
+            "👁️ Show Answers" if not show_answers else "🙈 Hide Answers",
+            use_container_width=True,
+        ):
             st.session_state.show_answers = not show_answers
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted:
         score = 0
         max_score = 0
         for i, q in enumerate(questions):
             ans = user_answers[i]
-            points = q.get('points', 1)
+            points = q.get("points", 1)
             max_score += points
-            if q.get('type') == 'MCQ':
-                if ans == q.get('correct_index'):
+            if q.get("type") == "MCQ":
+                if ans == q.get("correct_index"):
                     score += points
-            elif isinstance(ans, str) and ans.strip().lower() == q.get('answer', '').strip().lower():
+            elif (
+                isinstance(ans, str)
+                and ans.strip().lower() == q.get("answer", "").strip().lower()
+            ):
                 score += points
 
         st.markdown('<div class="score-card">', unsafe_allow_html=True)
-        st.markdown(f'<h2 style="color:#10b981; margin:0;">🏆 Score: {score} / {max_score}</h2>', unsafe_allow_html=True)
+        st.markdown(
+            f'<h2 style="color:#10b981; margin:0;">🏆 Score: {score} / {max_score}</h2>',
+            unsafe_allow_html=True,
+        )
         percentage = int((score / max_score) * 100) if max_score > 0 else 0
-        st.markdown(f'<p style="color:#94a3b8; margin-top:8px;">{percentage}% correct</p>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p style="color:#94a3b8; margin-top:8px;">{percentage}% correct</p>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.button('🔄 Generate New Quiz', use_container_width=True):
+        if st.button("🔄 Generate New Quiz", use_container_width=True):
             reset_quiz()
             st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_generator():
+def render_generator() -> None:
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown('<h1 class="title-gradient">🧠 Team Quiz Generator</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Upload any document or paste text to generate stunning quizzes</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<h1 class="title-gradient">🧠 Team Quiz Generator</h1>', unsafe_allow_html=True
+    )
+    st.markdown(
+        '<p class="subtitle">Upload any document or paste text to generate stunning quizzes</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📋 Question Type</label>', unsafe_allow_html=True)
+        st.markdown(
+            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📋 Question Type</label>',
+            unsafe_allow_html=True,
+        )
         question_type = st.selectbox(
-            'Question Type',
-            ['MCQ', 'Very Short Answer', 'Short Answer', 'Long Answer', 'Essay'],
-            index=['MCQ', 'Very Short Answer', 'Short Answer', 'Long Answer', 'Essay'].index(st.session_state.question_type),
-            label_visibility='collapsed'
+            "Question Type",
+            ["MCQ", "Very Short Answer", "Short Answer", "Long Answer", "Essay"],
+            index=[
+                "MCQ",
+                "Very Short Answer",
+                "Short Answer",
+                "Long Answer",
+                "Essay",
+            ].index(st.session_state.question_type),
+            label_visibility="collapsed",
         )
         st.session_state.question_type = question_type
     with col2:
-        st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">⚡ Difficulty</label>', unsafe_allow_html=True)
+        st.markdown(
+            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">⚡ Difficulty</label>',
+            unsafe_allow_html=True,
+        )
         difficulty = st.selectbox(
-            'Difficulty',
-            ['Basic', 'Intermediate', 'Pro'],
-            index=['Basic', 'Intermediate', 'Pro'].index(st.session_state.difficulty),
-            label_visibility='collapsed'
+            "Difficulty",
+            ["Basic", "Intermediate", "Pro"],
+            index=["Basic", "Intermediate", "Pro"].index(st.session_state.difficulty),
+            label_visibility="collapsed",
         )
         st.session_state.difficulty = difficulty
     with col3:
-        st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📏 Answer Length</label>', unsafe_allow_html=True)
+        st.markdown(
+            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📏 Answer Length</label>',
+            unsafe_allow_html=True,
+        )
         answer_length = st.selectbox(
-            'Answer Length',
-            ['1-line', '2-line', 'Detailed', 'Essay'],
-            index=['1-line', '2-line', 'Detailed', 'Essay'].index(st.session_state.answer_length),
-            label_visibility='collapsed'
+            "Answer Length",
+            ["1-line", "2-line", "Detailed", "Essay"],
+            index=["1-line", "2-line", "Detailed", "Essay"].index(
+                st.session_state.answer_length
+            ),
+            label_visibility="collapsed",
         )
         st.session_state.answer_length = answer_length
     with col4:
-        st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔢 Questions</label>', unsafe_allow_html=True)
-        num_questions = st.number_input('Number of questions', min_value=1, max_value=20, value=10, step=1, label_visibility='collapsed')
+        st.markdown(
+            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔢 Questions</label>',
+            unsafe_allow_html=True,
+        )
+        num_questions = st.number_input(
+            "Number of questions",
+            min_value=1,
+            max_value=20,
+            value=10,
+            step=1,
+            label_visibility="collapsed",
+        )
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🧠 Mode</label>', unsafe_allow_html=True)
+        st.markdown(
+            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🧠 Mode</label>',
+            unsafe_allow_html=True,
+        )
         mode = st.selectbox(
-            'Mode',
-            ['Local', 'AI-Powered (Gemini)'],
-            index=['Local', 'AI-Powered (Gemini)'].index(st.session_state.mode),
-            label_visibility='collapsed'
+            "Mode",
+            ["Local", "AI-Powered (Gemini)"],
+            index=["Local", "AI-Powered (Gemini)"].index(st.session_state.mode),
+            label_visibility="collapsed",
         )
         st.session_state.mode = mode
     with col2:
-        if mode == 'AI-Powered (Gemini)':
-            st.markdown('<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔑 Gemini API Key</label>', unsafe_allow_html=True)
+        if mode == "AI-Powered (Gemini)":
+            st.markdown(
+                '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔑 Gemini API Key</label>',
+                unsafe_allow_html=True,
+            )
             api_key = st.text_input(
-                'Gemini API Key',
+                "Gemini API Key",
                 value=st.session_state.api_key,
-                type='password',
-                label_visibility='collapsed',
-                placeholder='Paste your Gemini API key here'
+                type="password",
+                label_visibility="collapsed",
+                placeholder="Paste your Gemini API key here",
             )
             st.session_state.api_key = api_key
         else:
-            st.markdown('<label style="color:#94a3b8; font-weight:500; font-size:13px;">✅ Local mode active</label>', unsafe_allow_html=True)
-            st.session_state.api_key = ''
+            st.markdown(
+                '<label style="color:#94a3b8; font-weight:500; font-size:13px;">✅ Local mode active</label>',
+                unsafe_allow_html=True,
+            )
+            st.session_state.api_key = ""
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    with st.form('quiz_form'):
+    with st.form("quiz_form"):
         st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#94a3b8; font-size:14px; margin-bottom:12px;">📁 Upload your document</p>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
-            'Upload any supported file',
-            type=list(ALLOWED_EXTENSIONS),
-            label_visibility='collapsed'
+        st.markdown(
+            '<p style="color:#94a3b8; font-size:14px; margin-bottom:12px;">📁 Upload your document</p>',
+            unsafe_allow_html=True,
         )
-        st.markdown('</div>', unsafe_allow_html=True)
+        uploaded_file = st.file_uploader(
+            "Upload any supported file",
+            type=list(ALLOWED_EXTENSIONS),
+            label_visibility="collapsed",
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#94a3b8; font-size:14px; margin-bottom:8px;">✏️ Or paste text directly</p>', unsafe_allow_html=True)
-        text_input = st.text_area('Paste your text here', height=150, label_visibility='collapsed', placeholder='Paste your study material here...')
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<p style="color:#94a3b8; font-size:14px; margin-bottom:8px;">✏️ Or paste text directly</p>',
+            unsafe_allow_html=True,
+        )
+        text_input = st.text_area(
+            "Paste your text here",
+            height=150,
+            label_visibility="collapsed",
+            placeholder="Paste your study material here...",
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            submitted = st.form_submit_button('🚀 Generate Quiz', use_container_width=True)
+            submitted = st.form_submit_button(
+                "🚀 Generate Quiz", use_container_width=True
+            )
 
     if submitted:
         if uploaded_file is not None:
             if not allowed_file(uploaded_file.name):
-                st.error('❌ Unsupported file type. Please upload a supported file.')
+                st.error("❌ Unsupported file type. Please upload a supported file.")
                 return
             raw_content = uploaded_file.read()
             text_content = extract_text_from_file(raw_content, uploaded_file.name)
         else:
-            text_content = ''
+            text_content = ""
 
         if not text_content or not text_content.strip():
             text_content = text_input
 
         if not text_content or not text_content.strip():
-            st.warning('⚠️ Please upload a valid file or enter text so quiz questions can be generated.')
+            st.warning(
+                "⚠️ Please upload a valid file or enter text so quiz questions can be generated."
+            )
             return
 
         try:
-            with st.spinner('✨ Generating your quiz...'):
+            with st.spinner("✨ Generating your quiz..."):
                 mode = st.session_state.mode
-                if mode == 'AI-Powered (Gemini)':
+                if mode == "AI-Powered (Gemini)":
                     questions = generate_ai_quiz(
                         text_content,
                         num_questions,
@@ -557,7 +686,7 @@ def render_generator():
                     )
 
             if not questions:
-                st.error('❌ Failed to generate questions. Please try different input.')
+                st.error("❌ Failed to generate questions. Please try different input.")
                 return
 
             st.session_state.questions = questions
@@ -569,10 +698,12 @@ def render_generator():
             st.rerun()
 
         except Exception as exc:
-            st.error(f'❌ Could not generate quiz: {exc}')
+            st.error(f"❌ Could not generate quiz: {exc}")
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="footer">Made with ❤️ using Streamlit</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="footer">Made with ❤️ using Streamlit</div>', unsafe_allow_html=True
+    )
 
 
 if st.session_state.show_quiz and st.session_state.questions:

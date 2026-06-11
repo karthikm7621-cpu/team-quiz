@@ -1,0 +1,32 @@
+stages:
+  - lint
+  - security
+  - test
+
+variables:
+  PYTHON_VERSION: "3.12"
+
+default:
+  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pip install ruff mypy vulture bandit pytest pytest-cov
+
+linting:
+  stage: lint
+  script:
+    - ruff check .
+    - ruff format --check .
+    - mypy .
+    - vulture .
+
+security_analysis:
+  stage: security
+  script:
+    - bandit -r . -c pyproject.toml || bandit -r .
+
+test_and_coverage:
+  stage: test
+  script:
+    - pytest --cov=. --cov-report=term-missing --cov-fail-under=80

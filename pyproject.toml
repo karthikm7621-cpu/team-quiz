@@ -1,0 +1,50 @@
+[project]
+name = "team-quiz"
+version = "0.1.0"
+description = "Team Quiz Application"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+dependencies = [
+    "streamlit>=1.30.0",
+    "pypdf>=3.0.0",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+    "google-genai>=1.0.0"
+]
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "vulture",
+    "bandit[toml]",
+    "pytest",
+    "pytest-cov",
+    "pre-commit"
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=. --cov-report=term-missing"
+testpaths = [
+    "tests",
+]
