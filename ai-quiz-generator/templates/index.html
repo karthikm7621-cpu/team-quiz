@@ -216,7 +216,8 @@
             questions: [],
             currentIndex: 0,
             userAnswers: [],
-            isDark: localStorage.getItem('dark') === 'true'
+            isDark: localStorage.getItem('dark') === 'true',
+            apiKeyConfigured: true
         };
 
         const views = { upload: document.getElementById('uploadView'), quiz: document.getElementById('quizView'), results: document.getElementById('resultsView') };
@@ -231,6 +232,22 @@
             themeToggle: document.getElementById('themeToggle')
         };
 
+        // Check API key status on load
+        async function checkApiKeyStatus() {
+            try {
+                const res = await fetch('/check-api-key');
+                const data = await res.json();
+                state.apiKeyConfigured = data.configured;
+                if (!data.configured) {
+                    elements.generateBtn.disabled = true;
+                    elements.generateBtn.textContent = 'API Key Required - Check Console';
+                    alert('Warning: GEMINI_API_KEY is not configured. Please add it to your .env file and restart the server.');
+                }
+            } catch (err) {
+                console.warn('Could not check API key status:', err);
+            }
+        }
+
         // Theme toggle
         elements.themeToggle.addEventListener('click', () => {
             state.isDark = !state.isDark;
@@ -239,6 +256,8 @@
             localStorage.setItem('dark', state.isDark);
         });
         if (state.isDark) { document.body.classList.add('dark'); elements.themeToggle.textContent = '☀️'; }
+        
+        checkApiKeyStatus();
 
         // File upload handlers
         elements.dropZone.addEventListener('click', () => elements.fileInput.click());
