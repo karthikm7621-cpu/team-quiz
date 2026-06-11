@@ -11,7 +11,11 @@ Thank you for your interest in contributing to this project. Please follow these
 ```bash
 git clone https://code.swecha.org/karthik_7621/team-quiz.git
 cd team-quiz
-pip install -r requirements.txt
+
+# It is recommended to use a virtual environment
+python -m venv .venv
+source .venv/bin/activate # On Windows: .venv\Scripts\activate
+pip install -e .[dev]
 ```
 
 ## Code Standards

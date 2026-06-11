@@ -5,8 +5,11 @@ This application generates quizzes from uploaded documents or pasted text.
 
 ## Getting Started
 1. Install dependencies:
+   It is highly recommended to use a virtual environment.
    ```bash
-   pip install -r requirements.txt
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -e .[dev]
    ```
 2. Run the application:
    ```bash

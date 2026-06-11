@@ -1,8 +1,9 @@
 # AGENTS.md - Project Commands
 
-## Install Dependencies (ai-quiz-generator)
+## 1. Install Dependencies
+This command installs the project in editable mode along with all development tools. Run this once after cloning the repo or when `pyproject.toml` changes.
 ```bash
-pip install -r ai-quiz-generator/requirements.txt
+pip install -e .[dev]
 ```
 
 ## Set Up Environment (one-time)

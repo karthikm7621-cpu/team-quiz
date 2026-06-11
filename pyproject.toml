@@ -23,7 +23,9 @@ dev = [
     "pytest",
     "pytest-cov",
     "pre-commit",
-    "git-cliff"
+    "git-cliff",
+    "pip-audit",
+    "semgrep"
 ]
 
 [tool.ruff]

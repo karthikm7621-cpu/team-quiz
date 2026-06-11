@@ -1,32 +1,75 @@
+# .gitlab-ci.yml
+
 stages:
+  - build
+  - format
   - lint
+  - type_check
   - security
   - test
 
 variables:
   PYTHON_VERSION: "3.12"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# Cache pip dependencies to speed up subsequent jobs
+cache:
+  key:
+    files:
+      - pyproject.toml
+  paths:
+    - $PIP_CACHE_DIR
+    - .venv/
 
 default:
   image: python:${PYTHON_VERSION}-slim
   before_script:
+    - python -m venv .venv
+    - source .venv/bin/activate
     - python -m pip install --upgrade pip
-    - pip install -r requirements.txt
-    - pip install ruff mypy vulture bandit pytest pytest-cov
+    # Install project dependencies including dev tools from pyproject.toml
+    - pip install .[dev]
 
-linting:
+# Job to ensure dependencies can be installed
+install_deps:
+  stage: build
+  script:
+    - echo "Dependencies installed successfully in before_script."
+
+# Job for code formatting check
+format:
+  stage: format
+  script:
+    - ruff format --check .
+
+# Job for comprehensive linting (replaces Flake8, Pylint, Pyupgrade)
+lint:
   stage: lint
   script:
     - ruff check .
-    - ruff format --check .
-    - mypy .
-    - vulture .
 
-security_analysis:
+# Job for static type checking
+type_check:
+  stage: type_check
+  script:
+    - mypy .
+
+# Job for dependency vulnerability scanning
+dependency_audit:
   stage: security
   script:
-    - bandit -r . -c pyproject.toml || bandit -r .
+    - pip-audit
 
-test_and_coverage:
+# Job for Static Application Security Testing (SAST)
+semgrep_sast:
+  stage: security
+  script:
+    # The --config="auto" setting intelligently selects relevant rules.
+    - semgrep ci --config=auto
+
+coverage:
   stage: test
   script:
-    - pytest --cov=. --cov-report=term-missing --cov-fail-under=80
+    # Run tests, generate coverage report, and fail if coverage is below 85%
+    - pytest --cov=. --cov-report=term-missing --cov-fail-under=85
+  coverage: '/^TOTAL.+?(\d+\%)$/' # Regex to extract coverage percentage for GitLab UI
