@@ -22,7 +22,8 @@ dev = [
     "bandit[toml]",
     "pytest",
     "pytest-cov",
-    "pre-commit"
+    "pre-commit",
+    "git-cliff"
 ]
 
 [tool.ruff]
@@ -30,7 +31,7 @@ line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "PL", "RUF"]
 ignore = []
 
 [tool.mypy]

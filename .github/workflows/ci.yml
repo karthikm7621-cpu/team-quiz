@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  format-and-lint:
+  format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,10 +21,14 @@ jobs:
           pip install -e .[dev]
       - name: Ruff Format
         run: ruff format --check .
-      - name: Ruff Lint (replaces Pylint/Flake8/Pyupgrade)
+      - name: Ruff Lint (Enforces Pylint, Flake8, Pyupgrade)
         run: ruff check .
+      - name: Git-Cliff Check (Enforce Conventional Commits)
+        uses: orhun/git-cliff-action@v3
+        with:
+          args: --unreleased
 
-  type-check:
+  type_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +62,7 @@ jobs:
       - name: Dependency Audit
         run: pip-audit
 
-  test-and-coverage:
+  coverage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
