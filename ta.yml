@@ -1,0 +1,43 @@
+ta:
+  app:
+    title: "குழு வினாடி வினா ஜெனரேட்டர்"
+    subtitle: "அద్భుతமான வினாடி வினாக்களை உருவாக்க எந்த ஆவணத்தையும் பதிவேற்றவும் அல்லது உரையை ஒட்டவும்"
+    made_with: "ஸ்ட்ரீம்லிட் ❤️ உடன் உருவாக்கப்பட்டது"
+
+  generator:
+    question_type: "கேள்வி வகை"
+    difficulty: "கடினத்தன்மை"
+    answer_length: "பதில் நீளம்"
+    num_questions: "கேள்விகள்"
+    mode: "உருவாக்கும் முறை"
+    api_key_label: "{provider} API விசை"
+    api_key_placeholder: "உங்கள் {provider} API விசையை இங்கே ஒட்டவும்"
+    upload_label: "உங்கள் ஆவணத்தைப் பதிவேற்றவும்"
+    upload_help: "அல்லது உரையை நேரடியாக ஒட்டவும்"
+    text_placeholder: "உங்கள் படிப்புப் பொருளை இங்கே ஒட்டவும்..."
+    generate_button: "🚀 வினாடி வினாவை உருவாக்கு"
+    errors:
+      unsupported_file: "❌ ஆதரிக்கப்படாத கோப்பு வகை. தயவுசெய்து ஆதரிக்கப்படும் கோப்பைப் பதிவேற்றவும்."
+      no_input: "⚠️ வினாடி வினா கேள்விகளை உருவாக்க, தயவுசெய்து சரியான கோப்பைப் பதிவேற்றவும் அல்லது உரையை உள்ளிடவும்."
+      generation_failed: "❌ வினாடி வினாவை உருவாக்க முடியவில்லை: {error}"
+    spinner: "✨ உங்கள் வினாடி வினா உருவாக்கப்படுகிறது..."
+
+  quiz:
+    header: "🧠 குழு வினாடி வினா"
+    points_badge: "🏆 {points} மதிப்பெண்(கள்)"
+    question_prefix: "கே{index}"
+    select_answer_prompt: "👆 தொடர ஒரு பதிலைத் தேர்ந்தெடுக்கவும்"
+    submit_answer_button: "பதிலைச் சமர்ப்பி"
+    type_answer_prompt: "✍️ உங்கள் பதிலைத் தட்டச்சு செய்து சமர்ப்பி என்பதைக் கிளிக் செய்யவும்"
+    previous_button: "⬅️ முந்தையது"
+    next_button: "➡️ அடுத்தது"
+    submit_quiz_button: "📝 வினாடி வினாவைச் சமர்ப்பி"
+    show_answers_button: "👁️ பதில்களைக் காட்டு"
+    hide_answers_button: "🙈 பதில்களை மறை"
+    unanswered_warning: "⚠️ பதிலளிக்கப்படாத கேள்வி(கள்): {questions}"
+    your_answer: "உங்கள் பதில்"
+    correct_answer_label: "✅ பதில்:"
+    explanation_label: "💡 {explanation}"
+    score_card_header: "🏆 மதிப்பெண்: {score} / {max_score}"
+    score_percentage: "{percentage}% சரி"
+    new_quiz_button: "🔄 புதிய வினாடி வினாவை உருவாக்கு"

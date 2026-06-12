@@ -1,0 +1,43 @@
+en:
+  app:
+    title: "Team Quiz Generator"
+    subtitle: "Upload any document or paste text to generate stunning quizzes"
+    made_with: "Made with ❤️ using Streamlit"
+  
+  generator:
+    question_type: "Question Type"
+    difficulty: "Difficulty"
+    answer_length: "Answer Length"
+    num_questions: "Questions"
+    mode: "Generation Mode"
+    api_key_label: "{provider} API Key"
+    api_key_placeholder: "Paste your {provider} API key here"
+    upload_label: "Upload your document"
+    upload_help: "Or paste text directly"
+    text_placeholder: "Paste your study material here..."
+    generate_button: "🚀 Generate Quiz"
+    errors:
+      unsupported_file: "❌ Unsupported file type. Please upload a supported file."
+      no_input: "⚠️ Please upload a valid file or enter text to generate quiz questions."
+      generation_failed: "❌ Could not generate quiz: {error}"
+    spinner: "✨ Generating your quiz..."
+
+  quiz:
+    header: "🧠 Team Quiz"
+    points_badge: "🏆 {points} Mark(s)"
+    question_prefix: "Q{index}"
+    select_answer_prompt: "👆 Select an answer to continue"
+    submit_answer_button: "Submit Answer"
+    type_answer_prompt: "✍️ Type your answer and click Submit"
+    previous_button: "⬅️ Previous"
+    next_button: "➡️ Next"
+    submit_quiz_button: "📝 Submit Quiz"
+    show_answers_button: "👁️ Show Answers"
+    hide_answers_button: "🙈 Hide Answers"
+    unanswered_warning: "⚠️ Unanswered question(s): {questions}"
+    your_answer: "Your answer"
+    correct_answer_label: "✅ Answer:"
+    explanation_label: "💡 {explanation}"
+    score_card_header: "🏆 Score: {score} / {max_score}"
+    score_percentage: "{percentage}% correct"
+    new_quiz_button: "🔄 Generate New Quiz"

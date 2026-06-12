@@ -1,5 +1,3 @@
-import csv
-import io
 import json
 import logging
 import random
@@ -7,54 +5,9 @@ import re
 import time
 import typing
 
-from dotenv import load_dotenv
-from pypdf import PdfReader
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-
-ALLOWED_EXTENSIONS = {
-    "pdf",
-    "png",
-    "jpg",
-    "jpeg",
-    "txt",
-    "csv",
-    "docx",
-    "xlsx",
-    "xls",
-    "ppt",
-    "pptx",
-    "odt",
-    "rtf",
-    "json",
-    "xml",
-    "md",
-    "log",
-    "py",
-    "js",
-    "html",
-    "css",
-    "java",
-    "c",
-    "cpp",
-    "h",
-    "sql",
-    "sh",
-    "bat",
-    "mp3",
-    "mp4",
-    "wav",
-    "mov",
-    "avi",
-    "zip",
-    "rar",
-    "7z",
-    "tar",
-    "gz",
-}
 ALLOWED_QUESTION_TYPES = {
     "MCQ",
     "Very Short Answer",
@@ -64,109 +17,6 @@ ALLOWED_QUESTION_TYPES = {
 }
 DIFFICULTY_LEVELS = {"Basic", "Intermediate", "Pro"}
 ANSWER_LENGTHS = {"1-line", "2-line", "Detailed", "Essay"}
-
-
-def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def extract_text_from_txt(file_content: bytes) -> str:
-    for enc in ("utf-8", "latin-1", "cp1252"):
-        try:
-            return file_content.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return file_content.decode("utf-8", errors="ignore")
-
-
-def extract_text_from_csv(file_content: bytes) -> str:
-    decoded = extract_text_from_txt(file_content)
-    text_lines = []
-    try:
-        reader = csv.reader(decoded.strip().splitlines())
-        for row in reader:
-            text_lines.append(" ".join(row))
-    except Exception:
-        text_lines = [decoded]
-    return "\n".join(text_lines)
-
-
-def extract_text_from_pdf(file_content: bytes) -> str:
-    try:
-        reader = PdfReader(io.BytesIO(file_content))
-        pages_text = []
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                pages_text.append(page_text)
-        text = "\n".join(pages_text)
-        return text if text.strip() else ""
-    except Exception as e:
-        logger.error(f"PDF extraction failed: {e}")
-        return ""
-
-
-def extract_text_from_image(file_content: bytes, ext: str) -> str:
-    try:
-        import pytesseract
-        from PIL import Image
-
-        image = Image.open(io.BytesIO(file_content))
-        text = str(pytesseract.image_to_string(image))
-        return text.strip()
-    except Exception as e:
-        logger.error(f"Image OCR failed: {e}")
-        return ""
-
-
-def extract_text_from_file(file_content: bytes, filename: str) -> str:
-    if not allowed_file(filename):
-        raise ValueError(
-            "Unsupported file type. Please upload PDF, PNG, JPG, JPEG, TXT, or CSV."
-        )
-
-    ext = filename.rsplit(".", 1)[1].lower()
-
-    text_exts = {
-        "txt",
-        "csv",
-        "json",
-        "xml",
-        "md",
-        "log",
-        "py",
-        "js",
-        "html",
-        "css",
-        "java",
-        "c",
-        "cpp",
-        "h",
-        "sql",
-        "sh",
-        "bat",
-        "rtf",
-        "odt",
-        "docx",
-    }
-    if ext in text_exts:
-        if ext == "csv":
-            return extract_text_from_csv(file_content)
-        return extract_text_from_txt(file_content)
-
-    if ext == "pdf":
-        return extract_text_from_pdf(file_content)
-
-    if ext in {"png", "jpg", "jpeg"}:
-        return extract_text_from_image(file_content, ext)
-
-    # Best-effort fallback for other formats
-    try:
-        return extract_text_from_txt(file_content)
-    except Exception:
-        pass  # nosec B110
-
-    raise ValueError(f"Unable to extract text from .{ext} files in local mode")
 
 
 def _pick_keyword(sentence: str) -> str:
@@ -211,7 +61,7 @@ def _make_mcq(
     return question_text, options, correct_index
 
 
-def generate_questions(
+def generate_local_questions(
     text_content: str,
     num_questions: int = 10,
     question_type: str = "MCQ",
@@ -362,7 +212,7 @@ def generate_questions(
     return questions[:num_questions]
 
 
-def generate_ai_quiz(
+def generate_ai_questions(
     text_content: str,
     num_questions: int = 10,
     question_type: str = "MCQ",
@@ -376,10 +226,10 @@ def generate_ai_quiz(
     try:
         from google import genai
         from google.api_core import exceptions as google_exceptions
-        from google.genai import types
+        from google.generativeai.types import GenerationConfig
     except ImportError:
         raise RuntimeError("AI mode requires google-genai. Install it and try again.")
-
+    
     client = genai.Client(api_key=api_key.strip())
 
     type_map = {
@@ -421,10 +271,10 @@ def generate_ai_quiz(
                 f"{text_content}"
             )
 
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(
+                prompt,
+                generation_config=GenerationConfig(
                     response_mime_type="application/json",
                     max_output_tokens=MAX_OUTPUT_TOKENS,
                 ),
@@ -530,18 +380,3 @@ def generate_ai_quiz(
             raise RuntimeError(f"AI generation failed: {exc}") from exc
 
     raise RuntimeError("AI generation failed after retries.")
-
-
-def generate_quiz_locally(
-    text_content: str, num_questions: int = 10, question_type: str = "MCQ"
-) -> list[dict[str, typing.Any]]:
-    return generate_questions(
-        text_content,
-        num_questions=num_questions,
-        question_type=question_type,
-        difficulty="Basic",
-        answer_length="1-line",
-    )
-
-
-generate_quiz = generate_questions
