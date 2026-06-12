@@ -388,23 +388,23 @@ def render_generator() -> None:
             )
 
     if submitted:
+        text_content = ""
+        # Prioritize uploaded file
         if uploaded_file is not None:
             try:
                 raw_content = uploaded_file.read()
                 text_content = extract_text_from_file(raw_content, uploaded_file.name)
-            except ValueError as e:
+            except ValueError:
                 st.error(t("generator.errors.unsupported_file"))
                 return
-        else:
-            text_content = ""
+        
+        # If file is not provided or is empty, fall back to text input
+        if not text_content.strip():
+            text_content = text_input.strip()
 
-        if not text_content or not text_content.strip():
-            text_content = text_input
-
-        if not text_content or not text_content.strip():
-            st.warning(
-                t("generator.errors.no_input")
-            )
+        # Final check if any content is available
+        if not text_content:
+            st.warning(t("generator.errors.no_input"))
             return
 
         try:

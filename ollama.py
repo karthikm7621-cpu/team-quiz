@@ -50,11 +50,33 @@ class OllamaProvider(AIProvider):
                 format="json" # Use Ollama's JSON mode
             )
             
-            response_text = response.get("response", "{}")
-            data = json.loads(response_text)
-            return data.get("quiz", [])
+            response_text = response.get("response", "")
+            if not response_text.strip():
+                raise ValueError("Received empty response from Ollama model.")
 
+            data = json.loads(response_text)
+
+            if not isinstance(data, dict) or "quiz" not in data or not isinstance(data["quiz"], list):
+                raise ValueError("Ollama response must be a JSON object with a 'quiz' array.")
+
+            questions = [
+                item for item in data.get("quiz", []) 
+                if isinstance(item, dict) and "question" in item and "answer" in item
+            ]
+            
+            if not questions:
+                raise ValueError("No valid questions found in Ollama response.")
+
+            return questions
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Ollama generation failed - invalid JSON: {e}")
+            raise RuntimeError("Failed to parse JSON from Ollama. The model may not be following instructions.") from e
+        except ollama.ResponseError as e:
+            logger.error(f"Ollama API error: {e.error}")
+            if "model not found" in e.error:
+                raise RuntimeError(f"Ollama model '{self.model}' not found. Please pull it with `ollama pull {self.model}`.") from e
+            raise RuntimeError(f"An error occurred with the Ollama API: {e.error}") from e
         except Exception as e:
             logger.error(f"Ollama generation failed: {e}")
-            # You could check if the model exists or if the server is running
-            raise RuntimeError(f"Failed to generate quiz with Ollama. Is the server running and model '{self.model}' pulled?") from e
+            raise RuntimeError(f"Failed to generate quiz with Ollama. Is the server running and reachable at {self.config.get('host')}?") from e
