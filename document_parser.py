@@ -69,6 +69,46 @@ def extract_text_from_docx(file_content: bytes) -> str:
         logger.error(f"DOCX extraction failed: {e}")
         return ""
 
+def extract_text_from_pptx(file_content: bytes) -> str:
+    """Extracts text from a PPTX file."""
+    try:
+        from pptx import Presentation
+        prs = Presentation(io.BytesIO(file_content))
+        text_runs = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if not shape.has_text_frame:
+                    continue
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        text_runs.append(run.text)
+        return "\n".join(text_runs)
+    except ImportError:
+        logger.warning("PPTX parsing requires the `python-pptx` library.")
+        return "[PPTX parser not installed]"
+    except Exception as e:
+        logger.error(f"PPTX extraction failed: {e}")
+        return ""
+
+def extract_text_from_xlsx(file_content: bytes) -> str:
+    """Extracts text from an XLSX file."""
+    try:
+        from openpyxl import load_workbook
+        workbook = load_workbook(filename=io.BytesIO(file_content), read_only=True)
+        text_content = []
+        for sheet in workbook.worksheets:
+            for row in sheet.iter_rows():
+                row_text = [str(cell.value) for cell in row if cell.value is not None]
+                if row_text:
+                    text_content.append(" ".join(row_text))
+        return "\n".join(text_content)
+    except ImportError:
+        logger.warning("XLSX parsing requires the `openpyxl` library.")
+        return "[XLSX parser not installed]"
+    except Exception as e:
+        logger.error(f"XLSX extraction failed: {e}")
+        return ""
+
 
 def extract_text_from_file(file_content: bytes, filename: str) -> str:
     """
@@ -87,6 +127,8 @@ def extract_text_from_file(file_content: bytes, filename: str) -> str:
         "jpg": extract_text_from_image,
         "jpeg": extract_text_from_image,
         "docx": extract_text_from_docx,
+        "pptx": extract_text_from_pptx,
+        "xlsx": extract_text_from_xlsx,
     }
 
     # Use specific extractor if available, otherwise fallback to generic text
