@@ -19,6 +19,7 @@ en:
     errors:
       unsupported_file: "❌ Unsupported file type. Please upload a supported file."
       no_input: "⚠️ Please upload a valid file or enter text to generate quiz questions."
+      no_text_extracted: "⚠️ Could not extract any text from '{filename}'. The file might be empty or in an unsupported format. Please try another file or paste text directly."
       generation_failed: "❌ Could not generate quiz: {error}"
     spinner: "✨ Generating your quiz..."
 
