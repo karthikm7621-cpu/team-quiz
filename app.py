@@ -1,298 +1,103 @@
+"""
+Main Streamlit application file for the Team Quiz Generator.
+This file handles the UI, state management, and quiz generation logic.
+"""
 import streamlit as st
 from dotenv import load_dotenv
+import yaml
+from pathlib import Path
 
 from quiz_generator import (
     allowed_file,
     extract_text_from_file,
     generate_quiz,
     generate_ai_quiz,
+    generate_ollama_quiz,
     ALLOWED_EXTENSIONS,
 )
 
 load_dotenv()
 
+# --- HELPERS and SETUP ---
+@st.cache_data
+def load_css(file_name: Path):
+    """Loads a CSS file into the Streamlit app."""
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+def initialize_session_state():
+    """Initializes all required session state variables with default values."""
+    defaults = {
+        "questions": [],
+        "current_index": 0,
+        "user_answers": [],
+        "quiz_submitted": False,
+        "show_quiz": False,
+        "show_answers": False,
+        "question_type": "MCQ",
+        "difficulty": "Basic",
+        "answer_length": "1-line",
+        "mode": "Local",
+        "api_key": "",
+        "lang": "en",
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+# --- I18N and L10N SETUP ---
+@st.cache_data
+def load_translations(lang_code: str) -> dict:
+    """Loads translation strings from a YAML file."""
+    base_path = Path(__file__).parent
+    filepath = base_path / f"{lang_code}.yml"
+    if not filepath.exists():
+        filepath = base_path / "en.yml"  # Fallback to English
+    with open(filepath, "r", encoding="utf-8") as f:
+        lang_data = yaml.safe_load(f)
+        return lang_data.get(lang_code, {})
+
+def get_translator(lang_code: str):
+    """Returns a translator function for the given language."""
+    translations = load_translations(lang_code)
+    def t(key: str, **kwargs) -> str:
+        keys = key.split('.')
+        value = translations
+        try:
+            for k in keys:
+                value = value[k]
+            return str(value).format(**kwargs)
+        except (KeyError, TypeError):
+            return key  # Return the key if translation is not found
+    return t
+
 st.set_page_config(
     page_title="Team Quiz",
     page_icon="🧠",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="auto",
 )
+initialize_session_state()
+load_css(Path(__file__).parent / "style.css")
 
-if "questions" not in st.session_state:
-    st.session_state.questions = []
-if "current_index" not in st.session_state:
-    st.session_state.current_index = 0
-if "user_answers" not in st.session_state:
-    st.session_state.user_answers = []
-if "quiz_submitted" not in st.session_state:
-    st.session_state.quiz_submitted = False
-if "show_quiz" not in st.session_state:
-    st.session_state.show_quiz = False
-if "show_answers" not in st.session_state:
-    st.session_state.show_answers = False
-if "question_type" not in st.session_state:
-    st.session_state.question_type = "MCQ"
-if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "Basic"
-if "answer_length" not in st.session_state:
-    st.session_state.answer_length = "1-line"
-if "mode" not in st.session_state:
-    st.session_state.mode = "Local"
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
+# --- LANGUAGE SELECTOR ---
+languages = {"en": "English", "hi": "हिंदी (Hindi)", "ta": "தமிழ் (Tamil)"}
+with st.sidebar:
+    st.markdown("### Language / भाषा / மொழி")
+    selected_lang_code = st.selectbox(
+        "Language",
+        options=list(languages.keys()),
+        format_func=lambda code: languages[code],
+        key="lang_selector",
+        label_visibility="collapsed"
+    )
+    if selected_lang_code and selected_lang_code != st.session_state.lang:
+        st.session_state.lang = selected_lang_code
+        st.rerun()
 
-st.markdown(
-    """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+t = get_translator(st.session_state.lang)
 
-* {
-    font-family: 'Inter', sans-serif;
-}
-
-.stApp {
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    min-height: 100vh;
-}
-
-.main-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    border-radius: 24px;
-    padding: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    margin-bottom: 24px;
-}
-
-.question-card {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(16px);
-    border-radius: 20px;
-    padding: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    margin-bottom: 20px;
-}
-
-.header-section {
-    text-align: center;
-    padding: 30px 20px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
-    border-radius: 24px;
-    margin-bottom: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.badge-mcq {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.badge-very-short {
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.badge-short {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
-}
-
-.badge-long {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-}
-
-.badge-essay {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-}
-
-.points-badge {
-    background: rgba(255, 255, 255, 0.15);
-    color: #e2e8f0;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.stButton>button {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 24px;
-    font-weight: 600;
-    font-size: 14px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-}
-
-.stButton>button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
-    background: linear-gradient(135deg, #818cf8, #a78bfa);
-}
-
-.stButton>button:active {
-    transform: translateY(0);
-}
-
-.submit-btn>button {
-    background: linear-gradient(135deg, #10b981, #059669) !important;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
-}
-
-.submit-btn>button:hover {
-    background: linear-gradient(135deg, #34d399, #10b981) !important;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5) !important;
-}
-
-.answer-box {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 12px;
-    padding: 16px;
-    margin-top: 12px;
-}
-
-.correct-answer {
-    background: rgba(16, 185, 129, 0.15);
-    border-left: 4px solid #10b981;
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-top: 8px;
-}
-
-.score-card {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 16px;
-    padding: 20px;
-    text-align: center;
-    margin-top: 20px;
-}
-
-.title-gradient {
-    background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: 800;
-    font-size: 3rem;
-    letter-spacing: -1px;
-}
-
-.subtitle {
-    color: #94a3b8;
-    font-size: 1.1rem;
-    font-weight: 400;
-    margin-top: 8px;
-}
-
-.stProgress > div > div > div > div {
-    background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
-    border-radius: 999px;
-}
-
-.stSelectbox > div > div {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    color: white;
-}
-
-.stNumberInput > div > div > input {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    color: white;
-}
-
-.stTextArea > div > div > textarea {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    color: white;
-}
-
-.stTextInput > div > div > input {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    color: white;
-}
-
-.upload-zone {
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    padding: 30px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.upload-zone:hover {
-    border-color: rgba(99, 102, 241, 0.5);
-    background: rgba(99, 102, 241, 0.05);
-}
-
-.divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    margin: 24px 0;
-}
-
-.footer {
-    text-align: center;
-    color: #64748b;
-    font-size: 13px;
-    margin-top: 40px;
-    padding: 20px;
-}
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
+# --- LOGIC ---
 
 def reset_quiz() -> None:
     st.session_state.questions = []
@@ -327,21 +132,21 @@ def render_quiz() -> None:
 
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="title-gradient">🧠 Team Quiz</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="title-gradient">{t("quiz.header")}</h2>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="question-card">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 2])
     with col1:
         st.markdown(
-            f'<div class="points-badge">🏆 {points} Mark{"s" if points > 1 else ""}</div>',
+            f'<div class="points-badge">{t("quiz.points_badge", points=points)}</div>',
             unsafe_allow_html=True,
         )
     with col2:
         st.markdown(type_badge(q_type), unsafe_allow_html=True)
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     st.markdown(
-        f'<p style="color:#e2e8f0; font-size:16px; font-weight:500;">Q{current_index + 1}. {q["question"]}</p>',
+        f'<p style="color:#e2e8f0; font-size:16px; font-weight:500;">{t("quiz.question_prefix", index=current_index + 1)}. {q["question"]}</p>',
         unsafe_allow_html=True,
     )
 
@@ -372,18 +177,18 @@ def render_quiz() -> None:
                 else "Not answered"
             )
             st.markdown(
-                f'<div style="background:rgba(255,255,255,0.08); padding:12px; border-radius:10px; margin:8px 0;"><strong>Your answer:</strong> {answer_display}</div>',
+                f'<div style="background:rgba(255,255,255,0.08); padding:12px; border-radius:10px; margin:8px 0;"><strong>{t("quiz.your_answer")}:</strong> {answer_display}</div>',
                 unsafe_allow_html=True,
             )
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
         st.markdown(
-            '<div class="answer-box"><strong>✅ Answer:</strong><br>'
+            f'<div class="answer-box"><strong>{t("quiz.correct_answer_label")}</strong><br>'
             + str(q["answer"]).replace("\n", "<br>")
             + "</div>",
             unsafe_allow_html=True,
         )
-        st.caption(f"💡 {q['explanation']}")
+        st.caption(t("quiz.explanation_label", explanation=q['explanation']))
     else:
         if q_type == "MCQ":
             options = q.get("options", [])
@@ -397,40 +202,40 @@ def render_quiz() -> None:
                         st.rerun()
 
             if user_answers[current_index] is None:
-                st.caption("👆 Select an answer to continue")
+                st.caption(t("quiz.select_answer_prompt"))
         elif q_type in ("Very Short Answer", "Short Answer"):
             user_input = st.text_input(
-                "Type your answer",
+                "Type your answer here...",
                 key=f"short_{current_index}",
                 label_visibility="collapsed",
-                placeholder="Type your answer here...",
+                placeholder=t("quiz.type_answer_prompt"),
             )
             if st.button(
-                "Submit Answer",
+                t("quiz.submit_answer_button"),
                 key=f"submit_short_{current_index}",
                 use_container_width=True,
             ):
                 st.session_state.user_answers[current_index] = user_input
                 st.rerun()
             if user_answers[current_index] is None:
-                st.caption("✍️ Type your answer and click Submit Answer")
+                st.caption(t("quiz.type_answer_prompt"))
         else:
             user_input = st.text_area(
-                "Type your answer",
+                "Type your detailed answer here...",
                 key=f"long_{current_index}",
                 label_visibility="collapsed",
                 height=150,
-                placeholder="Type your detailed answer here...",
+                placeholder=t("quiz.type_answer_prompt"),
             )
             if st.button(
-                "Submit Answer",
+                t("quiz.submit_answer_button"),
                 key=f"submit_long_{current_index}",
                 use_container_width=True,
             ):
                 st.session_state.user_answers[current_index] = user_input
                 st.rerun()
             if user_answers[current_index] is None:
-                st.caption("✍️ Type your answer and click Submit Answer")
+                st.caption(t("quiz.type_answer_prompt"))
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -439,30 +244,30 @@ def render_quiz() -> None:
     )
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if current_index > 0 and st.button("⬅️ Previous", use_container_width=True):
+        if current_index > 0 and st.button(t("quiz.previous_button"), use_container_width=True):
             st.session_state.current_index -= 1
             st.rerun()
     with col2:
         if current_index < len(questions) - 1 and st.button(
-            "Next ➡️", use_container_width=True
+            t("quiz.next_button"), use_container_width=True
         ):
             st.session_state.current_index += 1
             st.rerun()
     with col3:
-        if not submitted and st.button("📝 Submit Quiz", use_container_width=True):
+        if not submitted and st.button(t("quiz.submit_quiz_button"), use_container_width=True):
             unanswered = [
                 i + 1
                 for i, a in enumerate(user_answers)
                 if a is None or (isinstance(a, str) and a.strip() == "")
             ]
             if unanswered:
-                st.warning(f"⚠️ Unanswered question(s): {unanswered}")
+                st.warning(t("quiz.unanswered_warning", questions=unanswered))
             else:
                 st.session_state.quiz_submitted = True
                 st.rerun()
     with col4:
         if st.button(
-            "👁️ Show Answers" if not show_answers else "🙈 Hide Answers",
+            t("quiz.show_answers_button") if not show_answers else t("quiz.hide_answers_button"),
             use_container_width=True,
         ):
             st.session_state.show_answers = not show_answers
@@ -487,17 +292,17 @@ def render_quiz() -> None:
 
         st.markdown('<div class="score-card">', unsafe_allow_html=True)
         st.markdown(
-            f'<h2 style="color:#10b981; margin:0;">🏆 Score: {score} / {max_score}</h2>',
+            f'<h2 style="color:#10b981; margin:0;">{t("quiz.score_card_header", score=score, max_score=max_score)}</h2>',
             unsafe_allow_html=True,
         )
         percentage = int((score / max_score) * 100) if max_score > 0 else 0
         st.markdown(
-            f'<p style="color:#94a3b8; margin-top:8px;">{percentage}% correct</p>',
+            f'<p style="color:#94a3b8; margin-top:8px;">{t("quiz.score_percentage", percentage=percentage)}</p>',
             unsafe_allow_html=True,
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.button("🔄 Generate New Quiz", use_container_width=True):
+        if st.button(t("quiz.new_quiz_button"), use_container_width=True):
             reset_quiz()
             st.rerun()
 
@@ -508,10 +313,10 @@ def render_generator() -> None:
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
     st.markdown(
-        '<h1 class="title-gradient">🧠 Team Quiz Generator</h1>', unsafe_allow_html=True
+        f'<h1 class="title-gradient">{t("app.title")}</h1>', unsafe_allow_html=True
     )
     st.markdown(
-        '<p class="subtitle">Upload any document or paste text to generate stunning quizzes</p>',
+        f'<p class="subtitle">{t("app.subtitle")}</p>',
         unsafe_allow_html=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
@@ -519,12 +324,12 @@ def render_generator() -> None:
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📋 Question Type</label>',
+            f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.question_type")}</label>',
             unsafe_allow_html=True,
         )
         question_type = st.selectbox(
             "Question Type",
-            ["MCQ", "Very Short Answer", "Short Answer", "Long Answer", "Essay"],
+            options=["MCQ", "Very Short Answer", "Short Answer", "Long Answer", "Essay"],
             index=[
                 "MCQ",
                 "Very Short Answer",
@@ -537,7 +342,7 @@ def render_generator() -> None:
         st.session_state.question_type = question_type
     with col2:
         st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">⚡ Difficulty</label>',
+            f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.difficulty")}</label>',
             unsafe_allow_html=True,
         )
         difficulty = st.selectbox(
@@ -549,7 +354,7 @@ def render_generator() -> None:
         st.session_state.difficulty = difficulty
     with col3:
         st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📏 Answer Length</label>',
+            f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.answer_length")}</label>',
             unsafe_allow_html=True,
         )
         answer_length = st.selectbox(
@@ -563,7 +368,7 @@ def render_generator() -> None:
         st.session_state.answer_length = answer_length
     with col4:
         st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔢 Questions</label>',
+            f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.num_questions")}</label>',
             unsafe_allow_html=True,
         )
         num_questions = st.number_input(
@@ -580,20 +385,20 @@ def render_generator() -> None:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🧠 Mode</label>',
+            f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.mode")}</label>',
             unsafe_allow_html=True,
         )
         mode = st.selectbox(
             "Mode",
-            ["Local", "AI-Powered (Gemini)"],
-            index=["Local", "AI-Powered (Gemini)"].index(st.session_state.mode),
+            ["Local", "Ollama (Local)", "AI-Powered (Gemini)"],
+            index=["Local", "Ollama (Local)", "AI-Powered (Gemini)"].index(st.session_state.mode),
             label_visibility="collapsed",
         )
         st.session_state.mode = mode
     with col2:
         if mode == "AI-Powered (Gemini)":
             st.markdown(
-                '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔑 Gemini API Key</label>',
+                f'<label style="color:#e2e8f0; font-weight:500; font-size:13px;">{t("generator.api_key_label", provider="Gemini")}</label>',
                 unsafe_allow_html=True,
             )
             api_key = st.text_input(
@@ -601,12 +406,17 @@ def render_generator() -> None:
                 value=st.session_state.api_key,
                 type="password",
                 label_visibility="collapsed",
-                placeholder="Paste your Gemini API key here",
+                placeholder=t("generator.api_key_placeholder", provider="Gemini"),
             )
             st.session_state.api_key = api_key
+        elif mode == "Ollama (Local)":
+            st.markdown(
+                f'<div style="height: 62px; display: flex; align-items: center; justify-content: start;"><label style="color:#94a3b8; font-weight:500; font-size:13px;">✅ {t("generator.ollama_active")}</label></div>',
+                unsafe_allow_html=True,
+            )
         else:
             st.markdown(
-                '<label style="color:#94a3b8; font-weight:500; font-size:13px;">✅ Local mode active</label>',
+                f'<div style="height: 62px; display: flex; align-items: center; justify-content: start;"><label style="color:#94a3b8; font-weight:500; font-size:13px;">{t("generator.local_active")}</label></div>',
                 unsafe_allow_html=True,
             )
             st.session_state.api_key = ""
@@ -616,39 +426,40 @@ def render_generator() -> None:
     with st.form("quiz_form"):
         st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
         st.markdown(
-            '<p style="color:#94a3b8; font-size:14px; margin-bottom:12px;">📁 Upload your document</p>',
+            f'<p style="color:#94a3b8; font-size:14px; margin-bottom:12px;">{t("generator.upload_label")}</p>',
             unsafe_allow_html=True,
         )
         uploaded_file = st.file_uploader(
             "Upload any supported file",
             type=list(ALLOWED_EXTENSIONS),
             label_visibility="collapsed",
+            help=t("generator.upload_help")
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
         st.markdown(
-            '<p style="color:#94a3b8; font-size:14px; margin-bottom:8px;">✏️ Or paste text directly</p>',
+            f'<p style="color:#94a3b8; font-size:14px; margin-bottom:8px;">{t("generator.upload_help")}</p>',
             unsafe_allow_html=True,
         )
         text_input = st.text_area(
-            "Paste your text here",
+            "Paste text",
             height=150,
             label_visibility="collapsed",
-            placeholder="Paste your study material here...",
+            placeholder=t("generator.text_placeholder"),
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             submitted = st.form_submit_button(
-                "🚀 Generate Quiz", use_container_width=True
+                t("generator.generate_button"), use_container_width=True
             )
 
     if submitted:
         if uploaded_file is not None:
             if not allowed_file(uploaded_file.name):
-                st.error("❌ Unsupported file type. Please upload a supported file.")
+                st.error(t("generator.errors.unsupported_file"))
                 return
             raw_content = uploaded_file.read()
             text_content = extract_text_from_file(raw_content, uploaded_file.name)
@@ -659,14 +470,13 @@ def render_generator() -> None:
             text_content = text_input
 
         if not text_content or not text_content.strip():
-            st.warning(
-                "⚠️ Please upload a valid file or enter text so quiz questions can be generated."
-            )
+            st.warning(t("generator.errors.no_input"))
             return
 
         try:
-            with st.spinner("✨ Generating your quiz..."):
+            with st.spinner(t("generator.spinner")):
                 mode = st.session_state.mode
+                api_key = st.session_state.api_key
                 if mode == "AI-Powered (Gemini)":
                     questions = generate_ai_quiz(
                         text_content,
@@ -674,7 +484,15 @@ def render_generator() -> None:
                         question_type=st.session_state.question_type,
                         difficulty=st.session_state.difficulty,
                         answer_length=st.session_state.answer_length,
-                        api_key=st.session_state.api_key,
+                        api_key=api_key,
+                    )
+                elif mode == "Ollama (Local)":
+                    questions = generate_ollama_quiz(
+                        text_content,
+                        num_questions,
+                        question_type=st.session_state.question_type,
+                        difficulty=st.session_state.difficulty,
+                        answer_length=st.session_state.answer_length,
                     )
                 else:
                     questions = generate_quiz(
@@ -686,7 +504,7 @@ def render_generator() -> None:
                     )
 
             if not questions:
-                st.error("❌ Failed to generate questions. Please try different input.")
+                st.error(t("generator.errors.generation_failed", error="No questions were generated."))
                 return
 
             st.session_state.questions = questions
@@ -698,11 +516,11 @@ def render_generator() -> None:
             st.rerun()
 
         except Exception as exc:
-            st.error(f"❌ Could not generate quiz: {exc}")
+            st.error(t("generator.errors.generation_failed", error=exc))
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        '<div class="footer">Made with ❤️ using Streamlit</div>', unsafe_allow_html=True
+        f'<div class="footer">{t("app.made_with")}</div>', unsafe_allow_html=True
     )
 
 
