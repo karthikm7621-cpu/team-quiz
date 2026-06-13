@@ -326,7 +326,6 @@ def generate_ai_quiz(
                     "long_answer": "long_answer",
                     "essay": "essay",
                     "very_short_answer": "short_answer",
-                    "multiple_choice": "MCQ",
                     "multiple-choice": "MCQ",
                     "veryshortanswer": "short_answer",
                 }
