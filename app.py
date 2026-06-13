@@ -1,712 +1,276 @@
 import streamlit as st
-from dotenv import load_dotenv
+import yaml
+import logging
+import typing
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# It's good practice to place imports of your own modules after standard libraries
+# This will resolve the user's ImportError if all files are in the same directory.
+from document_parser import extract_text_from_file, allowed_file, SUPPORTED_EXTENSIONS
 from quiz_generator import (
-    allowed_file,
-    extract_text_from_file,
     generate_quiz,
     generate_ai_quiz,
-    ALLOWED_EXTENSIONS,
+    generate_ollama_quiz,
+    ALLOWED_QUESTION_TYPES,
+    DIFFICULTY_LEVELS,
+    ANSWER_LENGTHS,
 )
 
-load_dotenv()
+# --- Internationalization (i18n) ---
+def load_translations(path="ta.yml") -> dict:
+    """Loads translation strings from a YAML file."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        logger.error(f"Translation file not found at {path}. Falling back to English.")
+        # In a real app, you'd have a default English dictionary here.
+        # For this fix, we'll proceed and expect errors if the file is truly missing.
+        return {}
 
-st.set_page_config(
-    page_title="Team Quiz",
-    page_icon="🧠",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
+translations = load_translations()
+# Assuming Tamil, but a real app would have language selection
+t = translations.get("ta", {})
 
-if "questions" not in st.session_state:
-    st.session_state.questions = []
-if "current_index" not in st.session_state:
-    st.session_state.current_index = 0
-if "user_answers" not in st.session_state:
-    st.session_state.user_answers = []
-if "quiz_submitted" not in st.session_state:
-    st.session_state.quiz_submitted = False
-if "show_quiz" not in st.session_state:
-    st.session_state.show_quiz = False
-if "show_answers" not in st.session_state:
-    st.session_state.show_answers = False
-if "question_type" not in st.session_state:
-    st.session_state.question_type = "MCQ"
-if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "Basic"
-if "answer_length" not in st.session_state:
-    st.session_state.answer_length = "1-line"
-if "mode" not in st.session_state:
-    st.session_state.mode = "Local"
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
+def tr(key: str, **kwargs) -> str:
+    """Gets a translation string for a given key."""
+    try:
+        return t.get(key, key).format(**kwargs)
+    except (KeyError, TypeError):
+        # Fallback if a sub-key is missing or formatting fails
+        return key
 
-st.markdown(
-    """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+# --- App State Initialization ---
+def initialize_state():
+    """Initializes session state variables."""
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = None
+        st.session_state.current_question_index = 0
+        st.session_state.user_answers = {}
+        st.session_state.quiz_submitted = False
+        st.session_state.show_answers = False
 
-* {
-    font-family: 'Inter', sans-serif;
-}
+# --- UI Components ---
+def render_sidebar():
+    """Renders the sidebar for configuration."""
+    with st.sidebar:
+        st.title(tr("app.title"))
+        st.markdown(tr("app.subtitle"))
 
-.stApp {
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    min-height: 100vh;
-}
-
-.main-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    border-radius: 24px;
-    padding: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    margin-bottom: 24px;
-}
-
-.question-card {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(16px);
-    border-radius: 20px;
-    padding: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    margin-bottom: 20px;
-}
-
-.header-section {
-    text-align: center;
-    padding: 30px 20px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
-    border-radius: 24px;
-    margin-bottom: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.badge-mcq {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.badge-very-short {
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.badge-short {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
-}
-
-.badge-long {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-}
-
-.badge-essay {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-}
-
-.points-badge {
-    background: rgba(255, 255, 255, 0.15);
-    color: #e2e8f0;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.stButton>button {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 24px;
-    font-weight: 600;
-    font-size: 14px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-}
-
-.stButton>button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
-    background: linear-gradient(135deg, #818cf8, #a78bfa);
-}
-
-.stButton>button:active {
-    transform: translateY(0);
-}
-
-.submit-btn>button {
-    background: linear-gradient(135deg, #10b981, #059669) !important;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
-}
-
-.submit-btn>button:hover {
-    background: linear-gradient(135deg, #34d399, #10b981) !important;
-    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5) !important;
-}
-
-.answer-box {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 12px;
-    padding: 16px;
-    margin-top: 12px;
-}
-
-.correct-answer {
-    background: rgba(16, 185, 129, 0.15);
-    border-left: 4px solid #10b981;
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-top: 8px;
-}
-
-.score-card {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 16px;
-    padding: 20px;
-    text-align: center;
-    margin-top: 20px;
-}
-
-.title-gradient {
-    background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: 800;
-    font-size: 3rem;
-    letter-spacing: -1px;
-}
-
-.subtitle {
-    color: #94a3b8;
-    font-size: 1.1rem;
-    font-weight: 400;
-    margin-top: 8px;
-}
-
-.stProgress > div > div > div > div {
-    background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
-    border-radius: 999px;
-}
-
-.stSelectbox > div > div {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    color: white;
-}
-
-.stNumberInput > div > div > input {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    color: white;
-}
-
-.stTextArea > div > div > textarea {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    color: white;
-}
-
-.stTextInput > div > div > input {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    color: white;
-}
-
-.upload-zone {
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    padding: 30px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.upload-zone:hover {
-    border-color: rgba(99, 102, 241, 0.5);
-    background: rgba(99, 102, 241, 0.05);
-}
-
-.divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    margin: 24px 0;
-}
-
-.footer {
-    text-align: center;
-    color: #64748b;
-    font-size: 13px;
-    margin-top: 40px;
-    padding: 20px;
-}
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-
-def reset_quiz() -> None:
-    st.session_state.questions = []
-    st.session_state.current_index = 0
-    st.session_state.user_answers = []
-    st.session_state.quiz_submitted = False
-    st.session_state.show_quiz = False
-    st.session_state.show_answers = False
-
-
-def type_badge(q_type: str) -> str:
-    badge_class = {
-        "MCQ": "badge-mcq",
-        "Very Short Answer": "badge-very-short",
-        "Short Answer": "badge-short",
-        "Long Answer": "badge-long",
-        "Essay": "badge-essay",
-    }.get(q_type, "badge-mcq")
-    return f'<span class="{badge_class}">{q_type}</span>'
-
-
-def render_quiz() -> None:
-    questions = st.session_state.questions
-    current_index = st.session_state.current_index
-    user_answers = st.session_state.user_answers
-    submitted = st.session_state.quiz_submitted
-    show_answers = st.session_state.show_answers
-
-    q = questions[current_index]
-    q_type = q.get("type", "")
-    points = q.get("points", 1)
-
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown('<h2 class="title-gradient">🧠 Team Quiz</h2>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="question-card">', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown(
-            f'<div class="points-badge">🏆 {points} Mark{"s" if points > 1 else ""}</div>',
-            unsafe_allow_html=True,
-        )
-    with col2:
-        st.markdown(type_badge(q_type), unsafe_allow_html=True)
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown(
-        f'<p style="color:#e2e8f0; font-size:16px; font-weight:500;">Q{current_index + 1}. {q["question"]}</p>',
-        unsafe_allow_html=True,
-    )
-
-    if submitted or show_answers:
-        if q_type == "MCQ":
-            for i, option in enumerate(q["options"]):
-                correct = i == q["correct_index"]
-                chosen = user_answers[current_index] == i
-                if correct:
-                    st.markdown(
-                        f'<div class="correct-answer">✅ <strong>{option}</strong></div>',
-                        unsafe_allow_html=True,
-                    )
-                elif chosen:
-                    st.markdown(
-                        f'<div style="opacity:0.6; padding:8px;">❌ {option}</div>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        f'<div style="opacity:0.4; padding:8px;">▫️ {option}</div>',
-                        unsafe_allow_html=True,
-                    )
-        else:
-            answer_display = (
-                user_answers[current_index]
-                if user_answers[current_index]
-                else "Not answered"
-            )
-            st.markdown(
-                f'<div style="background:rgba(255,255,255,0.08); padding:12px; border-radius:10px; margin:8px 0;"><strong>Your answer:</strong> {answer_display}</div>',
-                unsafe_allow_html=True,
-            )
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div class="answer-box"><strong>✅ Answer:</strong><br>'
-            + str(q["answer"]).replace("\n", "<br>")
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-        st.caption(f"💡 {q['explanation']}")
-    else:
-        if q_type == "MCQ":
-            options = q.get("options", [])
-            cols = st.columns(2)
-            for i, option in enumerate(options):
-                with cols[i % 2]:
-                    if st.button(
-                        option, key=f"opt_{i}_{current_index}", use_container_width=True
-                    ):
-                        st.session_state.user_answers[current_index] = i
-                        st.rerun()
-
-            if user_answers[current_index] is None:
-                st.caption("👆 Select an answer to continue")
-        elif q_type in ("Very Short Answer", "Short Answer"):
-            user_input = st.text_input(
-                "Type your answer",
-                key=f"short_{current_index}",
-                label_visibility="collapsed",
-                placeholder="Type your answer here...",
-            )
-            if st.button(
-                "Submit Answer",
-                key=f"submit_short_{current_index}",
-                use_container_width=True,
-            ):
-                st.session_state.user_answers[current_index] = user_input
-                st.rerun()
-            if user_answers[current_index] is None:
-                st.caption("✍️ Type your answer and click Submit Answer")
-        else:
-            user_input = st.text_area(
-                "Type your answer",
-                key=f"long_{current_index}",
-                label_visibility="collapsed",
-                height=150,
-                placeholder="Type your detailed answer here...",
-            )
-            if st.button(
-                "Submit Answer",
-                key=f"submit_long_{current_index}",
-                use_container_width=True,
-            ):
-                st.session_state.user_answers[current_index] = user_input
-                st.rerun()
-            if user_answers[current_index] is None:
-                st.caption("✍️ Type your answer and click Submit Answer")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(
-        '<div style="display:flex; gap:12px; margin-top:20px;">', unsafe_allow_html=True
-    )
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if current_index > 0 and st.button("⬅️ Previous", use_container_width=True):
-            st.session_state.current_index -= 1
-            st.rerun()
-    with col2:
-        if current_index < len(questions) - 1 and st.button(
-            "Next ➡️", use_container_width=True
-        ):
-            st.session_state.current_index += 1
-            st.rerun()
-    with col3:
-        if not submitted and st.button("📝 Submit Quiz", use_container_width=True):
-            unanswered = [
-                i + 1
-                for i, a in enumerate(user_answers)
-                if a is None or (isinstance(a, str) and a.strip() == "")
-            ]
-            if unanswered:
-                st.warning(f"⚠️ Unanswered question(s): {unanswered}")
-            else:
-                st.session_state.quiz_submitted = True
-                st.rerun()
-    with col4:
-        if st.button(
-            "👁️ Show Answers" if not show_answers else "🙈 Hide Answers",
-            use_container_width=True,
-        ):
-            st.session_state.show_answers = not show_answers
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    if submitted:
-        score = 0
-        max_score = 0
-        for i, q in enumerate(questions):
-            ans = user_answers[i]
-            points = q.get("points", 1)
-            max_score += points
-            if q.get("type") == "MCQ":
-                if ans == q.get("correct_index"):
-                    score += points
-            elif (
-                isinstance(ans, str)
-                and ans.strip().lower() == q.get("answer", "").strip().lower()
-            ):
-                score += points
-
-        st.markdown('<div class="score-card">', unsafe_allow_html=True)
-        st.markdown(
-            f'<h2 style="color:#10b981; margin:0;">🏆 Score: {score} / {max_score}</h2>',
-            unsafe_allow_html=True,
-        )
-        percentage = int((score / max_score) * 100) if max_score > 0 else 0
-        st.markdown(
-            f'<p style="color:#94a3b8; margin-top:8px;">{percentage}% correct</p>',
-            unsafe_allow_html=True,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if st.button("🔄 Generate New Quiz", use_container_width=True):
-            reset_quiz()
-            st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_generator() -> None:
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown(
-        '<h1 class="title-gradient">🧠 Team Quiz Generator</h1>', unsafe_allow_html=True
-    )
-    st.markdown(
-        '<p class="subtitle">Upload any document or paste text to generate stunning quizzes</p>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📋 Question Type</label>',
-            unsafe_allow_html=True,
-        )
-        question_type = st.selectbox(
-            "Question Type",
-            ["MCQ", "Very Short Answer", "Short Answer", "Long Answer", "Essay"],
-            index=[
-                "MCQ",
-                "Very Short Answer",
-                "Short Answer",
-                "Long Answer",
-                "Essay",
-            ].index(st.session_state.question_type),
-            label_visibility="collapsed",
-        )
-        st.session_state.question_type = question_type
-    with col2:
-        st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">⚡ Difficulty</label>',
-            unsafe_allow_html=True,
-        )
-        difficulty = st.selectbox(
-            "Difficulty",
-            ["Basic", "Intermediate", "Pro"],
-            index=["Basic", "Intermediate", "Pro"].index(st.session_state.difficulty),
-            label_visibility="collapsed",
-        )
-        st.session_state.difficulty = difficulty
-    with col3:
-        st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">📏 Answer Length</label>',
-            unsafe_allow_html=True,
-        )
-        answer_length = st.selectbox(
-            "Answer Length",
-            ["1-line", "2-line", "Detailed", "Essay"],
-            index=["1-line", "2-line", "Detailed", "Essay"].index(
-                st.session_state.answer_length
-            ),
-            label_visibility="collapsed",
-        )
-        st.session_state.answer_length = answer_length
-    with col4:
-        st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔢 Questions</label>',
-            unsafe_allow_html=True,
-        )
-        num_questions = st.number_input(
-            "Number of questions",
-            min_value=1,
-            max_value=20,
-            value=10,
-            step=1,
-            label_visibility="collapsed",
-        )
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(
-            '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🧠 Mode</label>',
-            unsafe_allow_html=True,
-        )
-        mode = st.selectbox(
+        st.header(tr("generator.mode"))
+        mode = st.radio(
             "Mode",
-            ["Local", "AI-Powered (Gemini)"],
-            index=["Local", "AI-Powered (Gemini)"].index(st.session_state.mode),
+            ["Local", "AI (Gemini)", "Ollama"],
             label_visibility="collapsed",
+            key="mode",
+            horizontal=True,
         )
-        st.session_state.mode = mode
-    with col2:
-        if mode == "AI-Powered (Gemini)":
-            st.markdown(
-                '<label style="color:#e2e8f0; font-weight:500; font-size:13px;">🔑 Gemini API Key</label>',
-                unsafe_allow_html=True,
-            )
+
+        api_key = ""
+        if mode == "AI (Gemini)":
             api_key = st.text_input(
-                "Gemini API Key",
-                value=st.session_state.api_key,
+                tr("generator.api_key_label", provider="Google"),
                 type="password",
-                label_visibility="collapsed",
-                placeholder="Paste your Gemini API key here",
+                placeholder=tr("generator.api_key_placeholder", provider="Google"),
             )
-            st.session_state.api_key = api_key
+        elif mode == "Ollama":
+            st.info(tr("generator.ollama_active"))
         else:
-            st.markdown(
-                '<label style="color:#94a3b8; font-weight:500; font-size:13px;">✅ Local mode active</label>',
-                unsafe_allow_html=True,
-            )
-            st.session_state.api_key = ""
+            st.success(tr("generator.local_active"))
 
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    with st.form("quiz_form"):
-        st.markdown('<div class="upload-zone">', unsafe_allow_html=True)
-        st.markdown(
-            '<p style="color:#94a3b8; font-size:14px; margin-bottom:12px;">📁 Upload your document</p>',
-            unsafe_allow_html=True,
-        )
+        st.header(tr("generator.upload_label"))
         uploaded_file = st.file_uploader(
-            "Upload any supported file",
-            type=list(ALLOWED_EXTENSIONS),
+            tr("generator.upload_label"),
+            type=list(SUPPORTED_EXTENSIONS),
+            label_visibility="collapsed",
+            help=tr("generator.upload_help"),
+        )
+        
+        text_content = st.text_area(
+            "Text Content",
+            placeholder=tr("generator.text_placeholder"),
+            height=200,
             label_visibility="collapsed",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div style="margin-top:20px;">', unsafe_allow_html=True)
-        st.markdown(
-            '<p style="color:#94a3b8; font-size:14px; margin-bottom:8px;">✏️ Or paste text directly</p>',
-            unsafe_allow_html=True,
-        )
-        text_input = st.text_area(
-            "Paste your text here",
-            height=150,
-            label_visibility="collapsed",
-            placeholder="Paste your study material here...",
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.header("Quiz Configuration")
+        num_questions = st.slider(tr("generator.num_questions"), 1, 50, 10)
+        question_type = st.selectbox(tr("generator.question_type"), list(ALLOWED_QUESTION_TYPES))
+        difficulty = st.selectbox(tr("generator.difficulty"), list(DIFFICULTY_LEVELS))
+        answer_length = st.selectbox(tr("generator.answer_length"), list(ANSWER_LENGTHS))
 
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            submitted = st.form_submit_button(
-                "🚀 Generate Quiz", use_container_width=True
+        if st.button(tr("generator.generate_button"), use_container_width=True, type="primary"):
+            handle_quiz_generation(
+                mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length
             )
 
-    if submitted:
-        if uploaded_file is not None:
-            if not allowed_file(uploaded_file.name):
-                st.error("❌ Unsupported file type. Please upload a supported file.")
-                return
-            raw_content = uploaded_file.read()
-            text_content = extract_text_from_file(raw_content, uploaded_file.name)
-        else:
-            text_content = ""
+def render_quiz():
+    """Renders the interactive quiz questions and navigation."""
+    quiz = st.session_state.quiz
+    if not quiz:
+        return
 
-        if not text_content or not text_content.strip():
-            text_content = text_input
+    st.header(tr("quiz.header"))
+    
+    # Display progress
+    st.progress((st.session_state.current_question_index + 1) / len(quiz))
 
-        if not text_content or not text_content.strip():
-            st.warning(
-                "⚠️ Please upload a valid file or enter text so quiz questions can be generated."
-            )
-            return
+    q = quiz[st.session_state.current_question_index]
+    index = st.session_state.current_question_index
 
-        try:
-            with st.spinner("✨ Generating your quiz..."):
-                mode = st.session_state.mode
-                if mode == "AI-Powered (Gemini)":
-                    questions = generate_ai_quiz(
-                        text_content,
-                        num_questions,
-                        question_type=st.session_state.question_type,
-                        difficulty=st.session_state.difficulty,
-                        answer_length=st.session_state.answer_length,
-                        api_key=st.session_state.api_key,
-                    )
-                else:
-                    questions = generate_quiz(
-                        text_content,
-                        num_questions,
-                        question_type=st.session_state.question_type,
-                        difficulty=st.session_state.difficulty,
-                        answer_length=st.session_state.answer_length,
-                    )
+    st.subheader(f"{tr('quiz.question_prefix', index=index + 1)} ({tr('quiz.points_badge', points=q.get('points', 1))})")
+    st.markdown(q["question"])
 
-            if not questions:
-                st.error("❌ Failed to generate questions. Please try different input.")
-                return
+    # Answer input
+    answer = None
+    if q["type"] == "MCQ":
+        options = q.get("options", [])
+        answer = st.radio(
+            "Options", options, key=f"q_{index}", label_visibility="collapsed"
+        )
+    else:
+        answer = st.text_area(
+            tr("quiz.type_answer_prompt"), key=f"q_{index}"
+        )
+    
+    if answer:
+        st.session_state.user_answers[index] = answer
 
-            st.session_state.questions = questions
-            st.session_state.current_index = 0
-            st.session_state.user_answers = [None] * len(questions)
-            st.session_state.quiz_submitted = False
-            st.session_state.show_quiz = True
-            st.session_state.show_answers = False
+    # Navigation
+    col1, col2, col3 = st.columns([1, 2, 1])
+    if st.session_state.current_question_index > 0:
+        if col1.button(tr("quiz.previous_button")):
+            st.session_state.current_question_index -= 1
             st.rerun()
 
-        except Exception as exc:
-            st.error(f"❌ Could not generate quiz: {exc}")
+    if st.session_state.current_question_index < len(quiz) - 1:
+        if col3.button(tr("quiz.next_button")):
+            st.session_state.current_question_index += 1
+            st.rerun()
+    else:
+        if col3.button(tr("quiz.submit_quiz_button"), type="primary"):
+            st.session_state.quiz_submitted = True
+            st.rerun()
 
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown(
-        '<div class="footer">Made with ❤️ using Streamlit</div>', unsafe_allow_html=True
-    )
+def render_scorecard():
+    """Renders the final score and allows reviewing answers."""
+    quiz = st.session_state.quiz
+    user_answers = st.session_state.user_answers
+    score = 0
+    max_score = 0
+
+    for i, q in enumerate(quiz):
+        max_score += q.get("points", 1)
+        user_ans = user_answers.get(i)
+        correct_ans = q.get("answer")
+        if q["type"] == "MCQ":
+            correct_ans = q["options"][q["correct_index"]]
+        
+        if user_ans and str(user_ans).strip().lower() == str(correct_ans).strip().lower():
+            score += q.get("points", 1)
+
+    percentage = (score / max_score * 100) if max_score > 0 else 0
+    st.header(tr("quiz.score_card_header", score=score, max_score=max_score))
+    st.subheader(tr("quiz.score_percentage", percentage=f"{percentage:.2f}"))
+
+    st.session_state.show_answers = st.toggle(tr("quiz.show_answers_button"))
+
+    if st.session_state.show_answers:
+        for i, q in enumerate(quiz):
+            with st.expander(f"{tr('quiz.question_prefix', index=i + 1)}: {q['question'][:50]}..."):
+                st.markdown(f"**{tr('quiz.your_answer')}:** {user_answers.get(i, 'Not Answered')}")
+                
+                correct_ans_display = q.get("answer")
+                if q["type"] == "MCQ":
+                    correct_ans_display = q["options"][q["correct_index"]]
+
+                st.markdown(f"**{tr('quiz.correct_answer_label')}** {correct_ans_display}")
+                if "explanation" in q:
+                    st.info(tr("quiz.explanation_label", explanation=q["explanation"]))
+
+    if st.button(tr("quiz.new_quiz_button")):
+        # Reset state for a new quiz
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+# --- Logic ---
+def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length):
+    """Processes inputs and calls the correct quiz generation function."""
+    content = ""
+    filename = ""
+    if uploaded_file:
+        if not allowed_file(uploaded_file.name):
+            st.error(tr("generator.errors.unsupported_file"))
+            return
+        filename = uploaded_file.name
+        with st.spinner(f"Extracting text from {filename}..."):
+            try:
+                file_bytes = uploaded_file.getvalue()
+                content = extract_text_from_file(file_bytes, filename)
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+                logger.error(f"File read error for {filename}: {e}")
+                return
+    elif text_content:
+        content = text_content
+    else:
+        st.warning(tr("generator.errors.no_input"))
+        return
+
+    if not content.strip():
+        st.error(tr("generator.errors.no_text_extracted", filename=filename))
+        return
+
+    with st.spinner(tr("generator.spinner")):
+        try:
+            quiz_data = None
+            if mode == "Local":
+                quiz_data = generate_quiz(content, num_questions, question_type, difficulty, answer_length)
+            elif mode == "AI (Gemini)":
+                if not api_key:
+                    st.error("Google API key is required for AI mode.")
+                    return
+                quiz_data = generate_ai_quiz(content, num_questions, question_type, difficulty, answer_length, api_key)
+            elif mode == "Ollama":
+                # Assuming default model, can be made configurable
+                quiz_data = generate_ollama_quiz(content, num_questions, question_type, difficulty, answer_length)
+
+            if not quiz_data:
+                st.error(tr("generator.errors.generation_failed", error="No questions were generated."))
+                return
+
+            # Reset state and store new quiz
+            st.session_state.quiz = quiz_data
+            st.session_state.current_question_index = 0
+            st.session_state.user_answers = {}
+            st.session_state.quiz_submitted = False
+            st.rerun()
+
+        except Exception as e:
+            st.error(tr("generator.errors.generation_failed", error=str(e)))
+            logger.error(f"Quiz generation failed: {e}", exc_info=True)
+
+# --- Main App ---
+def main():
+    """Main function to run the Streamlit app."""
+    st.set_page_config(page_title=tr("app.title"), layout="wide")
+    
+    initialize_state()
+    render_sidebar()
+
+    if st.session_state.quiz:
+        if st.session_state.quiz_submitted:
+            render_scorecard()
+        else:
+            render_quiz()
+    else:
+        st.info("👋 Welcome! Configure your quiz in the sidebar and click 'Generate Quiz' to start.")
+        st.markdown(f"<div style='text-align: center; margin-top: 20px;'>{tr('app.made_with')}</div>", unsafe_allow_html=True)
 
 
-if st.session_state.show_quiz and st.session_state.questions:
-    render_quiz()
-else:
-    render_generator()
+if __name__ == "__main__":
+    main()

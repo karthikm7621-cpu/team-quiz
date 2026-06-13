@@ -16,6 +16,8 @@ en:
     upload_help: "Or paste text directly"
     text_placeholder: "Paste your study material here..."
     generate_button: "🚀 Generate Quiz"
+    ollama_active: "Ollama mode active. Ensure server is running."
+    local_active: "✅ Local mode active. No key required."
     errors:
       unsupported_file: "❌ Unsupported file type. Please upload a supported file."
       no_input: "⚠️ Please upload a valid file or enter text to generate quiz questions."

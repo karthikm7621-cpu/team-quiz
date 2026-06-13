@@ -1,9 +1,9 @@
-from quiz_generator import (
+from document_parser import (
     allowed_file,
     extract_text_from_csv,
     extract_text_from_txt,
-    generate_quiz_locally,
 )
+from quiz_generator import generate_quiz
 
 
 def test_allowed_file_types() -> None:
@@ -26,9 +26,9 @@ def test_extract_text_from_csv() -> None:
     assert "Bob 85" in output
 
 
-def test_generate_quiz_locally() -> None:
+def test_generate_quiz() -> None:
     text = "Python is a programming language. It was created by Guido van Rossum. Python supports multiple programming paradigms and is widely used."
-    questions = generate_quiz_locally(text, 3)
+    questions = generate_quiz(text, 3)
     assert len(questions) >= 1
     assert len(questions) <= 3
     for q in questions:

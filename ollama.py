@@ -1,21 +1,16 @@
 import ollama
 import json
-from .base import AIProvider
 from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
-class OllamaProvider(AIProvider):
+class OllamaProvider:
     """Provider for running local inference with Ollama."""
 
-    @property
-    def name(self) -> str:
-        return "Ollama (Local)"
-
     def __init__(self, model: str = "llama3", **kwargs):
-        # Default to llama3 if no model is specified
-        super().__init__(model=model, **kwargs)
+        self.model = model
+        self.config = kwargs
         self.client = ollama.Client(host=self.config.get("host"))
 
     def generate_quiz(

@@ -8,6 +8,8 @@ import typing
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from ollama import OllamaProvider
+
 ALLOWED_QUESTION_TYPES = {
     "MCQ",
     "Very Short Answer",
@@ -61,7 +63,7 @@ def _make_mcq(
     return question_text, options, correct_index
 
 
-def generate_local_questions(
+def generate_quiz(
     text_content: str,
     num_questions: int = 10,
     question_type: str = "MCQ",
@@ -212,7 +214,7 @@ def generate_local_questions(
     return questions[:num_questions]
 
 
-def generate_ai_questions(
+def generate_ai_quiz(
     text_content: str,
     num_questions: int = 10,
     question_type: str = "MCQ",
@@ -324,7 +326,6 @@ def generate_ai_questions(
                     "long_answer": "long_answer",
                     "essay": "essay",
                     "very_short_answer": "short_answer",
-                    "multiple_choice": "MCQ",
                     "multiple-choice": "MCQ",
                     "veryshortanswer": "short_answer",
                 }
@@ -380,3 +381,22 @@ def generate_ai_questions(
             raise RuntimeError(f"AI generation failed: {exc}") from exc
 
     raise RuntimeError("AI generation failed after retries.")
+
+
+def generate_ollama_quiz(
+    text_content: str,
+    num_questions: int,
+    question_type: str,
+    difficulty: str,
+    answer_length: str,
+    model: str = "llama3",
+) -> list[dict[str, typing.Any]]:
+    """Generates quiz questions using a local Ollama model."""
+    provider = OllamaProvider(model=model)
+    return provider.generate_quiz(
+        text_content=text_content,
+        num_questions=num_questions,
+        question_type=question_type,
+        difficulty=difficulty,
+        answer_length=answer_length,
+    )
