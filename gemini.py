@@ -1,5 +1,5 @@
-from .base import AIProvider
-from features.quiz_generator import generate_ai_questions
+from base import AIProvider
+from quiz_generator import generate_ai_quiz
 from typing import List, Dict, Any
 
 class GeminiProvider(AIProvider):
@@ -20,6 +20,6 @@ class GeminiProvider(AIProvider):
         if not self.api_key:
             raise ValueError("Gemini API key is required.")
         
-        return generate_ai_questions(
+        return generate_ai_quiz(
             text_content, num_questions, question_type, difficulty, answer_length, self.api_key
         )

@@ -1,5 +1,5 @@
 from cryptography.fernet import Fernet
-from .config import settings
+from config import settings
 import base64
 
 # It's crucial that APP_SECRET_KEY is a 32-byte URL-safe base64-encoded key.

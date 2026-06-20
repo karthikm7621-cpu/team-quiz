@@ -20,28 +20,7 @@ from quiz_generator import (
 )
 
 # --- Internationalization (i18n) ---
-def load_translations(path="ta.yml") -> dict:
-    """Loads translation strings from a YAML file."""
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        logger.error(f"Translation file not found at {path}. Falling back to English.")
-        # In a real app, you'd have a default English dictionary here.
-        # For this fix, we'll proceed and expect errors if the file is truly missing.
-        return {}
-
-translations = load_translations()
-# Assuming Tamil, but a real app would have language selection
-t = translations.get("ta", {})
-
-def tr(key: str, **kwargs) -> str:
-    """Gets a translation string for a given key."""
-    try:
-        return t.get(key, key).format(**kwargs)
-    except (KeyError, TypeError):
-        # Fallback if a sub-key is missing or formatting fails
-        return key
+from i18n_utils import t as tr, set_language, SUPPORTED_LANGUAGES
 
 # --- App State Initialization ---
 def initialize_state():
@@ -58,6 +37,17 @@ def render_sidebar():
     """Renders the sidebar for configuration."""
     with st.sidebar:
         st.title(tr("app.title"))
+        
+        # Language Selection
+        st.markdown(tr("language.select"))
+        cols = st.columns(len(SUPPORTED_LANGUAGES))
+        for i, (lang_code, lang_name) in enumerate(SUPPORTED_LANGUAGES.items()):
+            if cols[i].button(lang_name, key=f"lang_{lang_code}", use_container_width=True):
+                set_language(lang_code)
+                st.rerun()
+
+        st.markdown("---") # Visual separator
+
         st.markdown(tr("app.subtitle"))
 
         st.header(tr("generator.mode"))
@@ -89,6 +79,9 @@ def render_sidebar():
             help=tr("generator.upload_help"),
         )
         
+        doc_lang_options = list(SUPPORTED_LANGUAGES.keys())
+        doc_lang = st.selectbox("Document Language", doc_lang_options, format_func=lambda x: SUPPORTED_LANGUAGES[x])
+
         text_content = st.text_area(
             "Text Content",
             placeholder=tr("generator.text_placeholder"),
@@ -104,7 +97,7 @@ def render_sidebar():
 
         if st.button(tr("generator.generate_button"), use_container_width=True, type="primary"):
             handle_quiz_generation(
-                mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length
+                mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length, doc_lang
             )
 
 def render_quiz():
@@ -198,7 +191,7 @@ def render_scorecard():
         st.rerun()
 
 # --- Logic ---
-def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length):
+def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length, doc_lang):
     """Processes inputs and calls the correct quiz generation function."""
     content = ""
     filename = ""
@@ -210,7 +203,7 @@ def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_quest
         with st.spinner(f"Extracting text from {filename}..."):
             try:
                 file_bytes = uploaded_file.getvalue()
-                content = extract_text_from_file(file_bytes, filename)
+                content = extract_text_from_file(file_bytes, filename, lang=doc_lang)
             except Exception as e:
                 st.error(f"Error reading file: {e}")
                 logger.error(f"File read error for {filename}: {e}")

@@ -1,19 +1,26 @@
 import streamlit as st
 from pathlib import Path
-from streamlit_option_menu import option_menu
 
 # --- Core Imports ---
-from core.i18n import t, set_language, SUPPORTED_LANGUAGES
-from core.config import settings
+from i18n_utils import t, set_language, SUPPORTED_LANGUAGES
+from config import settings
 
 # --- Feature Imports ---
-from features.document_parser import extract_text_from_file, SUPPORTED_EXTENSIONS
+from document_parser import extract_text_from_file, SUPPORTED_EXTENSIONS
+from rag_workflow import (
+    create_vector_store,
+    extract_text_chunks,
+    generate_answer,
+    get_embedding_model,
+    get_llm,
+    retrieve_context,
+)
 
 # --- AI Provider Imports ---
-from providers.base import AIProvider
-from providers.local import LocalProvider
-from providers.gemini import GeminiProvider
-from providers.ollama import OllamaProvider
+from base import AIProvider
+from local import LocalProvider
+from gemini import GeminiProvider
+from ollama import OllamaProvider
 
 
 # --- Page Config ---
@@ -47,6 +54,12 @@ if "provider_name" not in st.session_state:
     st.session_state.provider_name = "Local" # Default provider
 if "api_key" not in st.session_state:
     st.session_state.api_key = "" # For BYOK
+if "qna_chunks" not in st.session_state:
+    st.session_state.qna_chunks = None
+if "qna_vector_store" not in st.session_state:
+    st.session_state.qna_vector_store = None
+if "qna_doc_filename" not in st.session_state:
+    st.session_state.qna_doc_filename = None
 
 
 def reset_quiz() -> None:
@@ -441,12 +454,56 @@ def render_generator() -> None:
     )
 
 
+def render_qna() -> None:
+    """Renders the Document Q&A interface."""
+    st.markdown('<div class="main-card">', unsafe_allow_html=True)
+    st.markdown('<div class="header-section">', unsafe_allow_html=True)
+    st.markdown(f'<h1 class="title-gradient">📄 {t("qna.mode_name")}</h1>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # The document upload is handled in the sidebar within main()
+
+    if st.session_state.qna_vector_store is None:
+        st.warning(t("qna.error_no_document"))
+    else:
+        embedding_model = get_embedding_model()
+        llm = get_llm()
+
+        question = st.text_input(
+            "qna_question",
+            placeholder=t("qna.question_placeholder"),
+            label_visibility="collapsed"
+        )
+
+        if st.button(t("qna.ask_button"), use_container_width=True, type="primary"):
+            if not question:
+                st.error(t("qna.error_no_question"))
+            elif llm is None:
+                st.error("The local LLM is not loaded. Please check the model path and configuration.")
+            else:
+                with st.spinner(t("qna.spinner")):
+                    context = retrieve_context(question, st.session_state.qna_vector_store, st.session_state.qna_chunks, embedding_model)
+                    answer = generate_answer(question, context, llm)
+                
+                st.subheader(t("qna.answer_header"))
+                st.markdown(answer)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def main():
     """Main application entry point."""
     load_css()
 
     with st.sidebar:
         st.markdown("## Settings")
+        
+        app_mode = st.radio(
+            "Mode",
+            options=["Quiz Generator", "Document Q&A"],
+            key="app_mode"
+        )
+        st.markdown("---")
         
         # Language Switcher
         lang_name = st.selectbox(
@@ -458,11 +515,42 @@ def main():
         if lang_code != st.session_state.language:
             set_language(lang_code)
             st.rerun()
+        
+        # Conditional sidebar for Q&A
+        if app_mode == "Document Q&A":
+            st.markdown("---")
+            st.header(t("qna.upload_label"))
+            uploaded_file = st.file_uploader("qna_uploader", type="pdf", accept_multiple_files=False, label_visibility="collapsed")
 
-    if st.session_state.show_quiz and st.session_state.questions:
-        render_quiz()
-    else:
-        render_generator()
+            if uploaded_file:
+                if uploaded_file.name != st.session_state.qna_doc_filename:
+                    st.session_state.qna_doc_filename = uploaded_file.name
+
+                    temp_dir = Path("temp_docs")
+                    temp_dir.mkdir(exist_ok=True)
+                    file_path = temp_dir / uploaded_file.name
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+
+                    with st.spinner(f"Processing {uploaded_file.name}..."):
+                        st.session_state.qna_chunks = extract_text_chunks(file_path)
+
+                        if not st.session_state.qna_chunks:
+                            st.error("Could not extract text from the PDF.")
+                        else:
+                            embedding_model = get_embedding_model()
+                            st.session_state.qna_vector_store = create_vector_store(st.session_state.qna_chunks, embedding_model)
+                            st.success(f"✅ Ready to answer questions about **{uploaded_file.name}**")
+                else:
+                    st.info(f"✅ **{uploaded_file.name}** is already loaded.")
+
+    if app_mode == "Quiz Generator":
+        if st.session_state.show_quiz and st.session_state.questions:
+            render_quiz()
+        else:
+            render_generator()
+    elif app_mode == "Document Q&A":
+        render_qna()
 
 if __name__ == "__main__":
     main()

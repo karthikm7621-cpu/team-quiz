@@ -3,6 +3,9 @@ hi:
     title: "टीम क्विज़ जेनरेटर"
     subtitle: "शानदार क्विज़ बनाने के लिए कोई भी दस्तावेज़ अपलोड करें या टेक्स्ट पेस्ट करें"
     made_with: "❤️ Streamlit का उपयोग करके बनाया गया"
+
+  language:
+    select: "भाषा चुनें"
   
   generator:
     question_type: "प्रश्न का प्रकार"
@@ -11,7 +14,8 @@ hi:
     num_questions: "प्रश्न"
     mode: "जनरेशन मोड"
     api_key_label: "{provider} एपीआई कुंजी"
-    api_key_placeholder: "अपनी {provider} एपीआई कुंजी यहाँ पेस्ट करें"
+    api_key_placeholder: "अपनी
+ {provider} एपीआई कुंजी यहाँ पेस्ट करें"
     upload_label: "अपना दस्तावेज़ अपलोड करें"
     upload_help: "या सीधे टेक्स्ट पेस्ट करें"
     text_placeholder: "अपनी अध्ययन सामग्री यहाँ पेस्ट करें..."
