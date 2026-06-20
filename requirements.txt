@@ -1,4 +1,6 @@
 streamlit
+Flask
+google-adk
 pypdf
 pytesseract
 Pillow
@@ -8,3 +10,12 @@ openpyxl
 google-generativeai
 ollama
 PyYAML
+python-i18n
+faiss-cpu
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-google-genai
+sentence-transformers
+pymupdf4llm

@@ -2,6 +2,7 @@ import io
 import csv
 import logging
 from pypdf import PdfReader
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,15 @@ SUPPORTED_EXTENSIONS = {
     "pdf", "txt", "csv", "md", "json", "py", "js", "html", "css",
     "png", "jpg", "jpeg", # For OCR
     "docx", "pptx", "xlsx" # For document intelligence
+}
+
+# Mapping from app language codes to Tesseract language codes
+TESSERACT_LANG_MAP = {
+    "en": "eng",
+    "te": "tel",
+    "hi": "hin",
+    "kn": "kan",
+    "ta": "tam",
 }
 
 def allowed_file(filename: str) -> bool:
@@ -33,22 +43,62 @@ def extract_text_from_csv(file_content: bytes) -> str:
     except Exception:
         return decoded # Fallback to plain text extraction
 
-def extract_text_from_pdf(file_content: bytes) -> str:
-    """Extracts text from a PDF file."""
+def extract_text_from_pdf(file_content: bytes, lang: str = "en") -> str:
+    """Extracts text from a PDF file, with an OCR fallback for scanned documents."""
+    text = ""
     try:
         reader = PdfReader(io.BytesIO(file_content))
-        return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
     except Exception as e:
-        logger.error(f"PDF extraction failed: {e}")
-        return ""
+        logger.error(f"PyPDF2 extraction failed: {e}")
 
-def extract_text_from_image(file_content: bytes) -> str:
+    # If no text is extracted, it might be a scanned PDF. Try OCR.
+    if not text.strip():
+        logger.info("No text found with standard PDF extraction, attempting OCR...")
+        try:
+            from pymupdf4llm import to_markdown
+            # This library can handle the conversion and OCR internally if needed
+            # For this case, let's stick to a more direct OCR approach if pymupdf fails
+            # We will convert pages to images and then OCR them.
+            import fitz # PyMuPDF
+            import pytesseract
+            from PIL import Image
+
+            doc = fitz.open(stream=file_content, filetype="pdf")
+            ocr_text = []
+            tess_lang = TESSERACT_LANG_MAP.get(lang, "eng")
+
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                pix = page.get_pixmap()
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                ocr_text.append(pytesseract.image_to_string(img, lang=tess_lang))
+            
+            text = "\n".join(ocr_text)
+            logger.info(f"Extracted {len(text)} characters via OCR.")
+
+        except ImportError:
+            logger.warning("OCR dependencies not found. Install `PyMuPDF`, `pytesseract`, and `Tesseract` for scanned PDF support.")
+            return "[Scanned PDF - OCR not configured]"
+        except Exception as e:
+            logger.error(f"PDF OCR process failed: {e}")
+            return ""
+
+    return text
+
+
+def extract_text_from_image(file_content: bytes, lang: str = "en") -> str:
     """Extracts text from an image using OCR (requires tesseract)."""
     try:
         import pytesseract
         from PIL import Image
+        
+        tess_lang = TESSERACT_LANG_MAP.get(lang, "eng")
         image = Image.open(io.BytesIO(file_content))
-        return pytesseract.image_to_string(image)
+        return pytesseract.image_to_string(image, lang=tess_lang)
     except ImportError:
         logger.warning("OCR requires `pytesseract` and a Tesseract installation.")
         return "[OCR not configured]"
@@ -110,7 +160,7 @@ def extract_text_from_xlsx(file_content: bytes) -> str:
         return ""
 
 
-def extract_text_from_file(file_content: bytes, filename: str) -> str:
+def extract_text_from_file(file_content: bytes, filename: str, lang: str = "en") -> str:
     """
     Unified function to extract text from various file types.
     This acts as the content extraction pipeline.
@@ -120,12 +170,15 @@ def extract_text_from_file(file_content: bytes, filename: str) -> str:
     if not allowed_file(filename):
         raise ValueError(f"Unsupported file type: .{ext}")
 
+    # Handlers for language-sensitive and other complex extractions
+    if ext == "pdf":
+        return extract_text_from_pdf(file_content, lang=lang)
+    if ext in ("png", "jpg", "jpeg"):
+        return extract_text_from_image(file_content, lang=lang)
+
+    # Standard handlers
     extraction_map = {
-        "pdf": extract_text_from_pdf,
         "csv": extract_text_from_csv,
-        "png": extract_text_from_image,
-        "jpg": extract_text_from_image,
-        "jpeg": extract_text_from_image,
         "docx": extract_text_from_docx,
         "pptx": extract_text_from_pptx,
         "xlsx": extract_text_from_xlsx,

@@ -63,6 +63,121 @@ def _make_mcq(
     return question_text, options, correct_index
 
 
+def _generate_local_mcq(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+    qtxt, options, ci = _make_mcq(sentence, difficulty, answer_length, points)
+    word = options[ci]
+
+    answer_map = {
+        "1-line": word,
+        "2-line": f"{word} – it is the key term identified in the given context.",
+        "Detailed": f'{word} is the correct answer. It matches the context of: "{sentence[:60]}..." It carries significant meaning here.',
+        "Essay": (
+            f"{word} is the correct answer. "
+            f'In the context of "{sentence[:70]}...", this term holds the most weight. '
+            f"Option analysis shows it aligns with the passage better than distractors. "
+            f"Therefore, {word} is selected based on contextual relevance."
+        )
+    }
+
+    return {
+        "type": "MCQ",
+        "question": qtxt,
+        "points": points,
+        "options": options,
+        "correct_index": ci,
+        "answer": answer_map.get(answer_length, word),
+        "explanation": f'Reference: "{sentence[:60]}..."',
+    }
+
+def _generate_local_vsa(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+    word = _pick_keyword(sentence)
+
+    q_map = {
+        "Basic": (f'[{points} mark] What is "{word}"?', word),
+        "Intermediate": (f'[{points} mark] State the meaning of "{word}" from the text.', f"{word} refers to the key concept in the passage."),
+        "Pro": (f'[{points} mark] Why is "{word}" significant in the passage?', f"{word} is significant because it connects multiple ideas in the passage."),
+    }
+    question, answer = q_map.get(difficulty, q_map["Basic"])
+
+    if answer_length != "1-line":
+        answer += f" {sentence[:60]}..."
+
+    return {
+        "type": "Very Short Answer",
+        "question": question,
+        "points": points,
+        "answer": answer,
+        "explanation": f'Reference: "{sentence[:60]}..."',
+    }
+
+def _generate_local_short_answer(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+    word = _pick_keyword(sentence)
+
+    q_map = {
+        "Basic": (f"[{points} mark] Explain briefly: {sentence[:80]}...", f"{word} is a key term that supports the main idea."),
+        "Intermediate": (f'[{points} mark] Describe briefly how "{word}" affects the passage.', f"{word} has a direct impact on the passage meaning. It helps readers understand the central theme better."),
+        "Pro": (f'[{points} mark] Pro-level: Explain the role of "{word}" in this context with one example.', f'{word} plays a key role by reinforcing the theme. For example, in the sentence "{sentence[:60]}...", it elevates the overall message.'),
+    }
+    question, answer = q_map.get(difficulty, q_map["Basic"])
+
+    if answer_length == "Detailed":
+        answer += f" {sentence[:60]}..."
+
+    return {
+        "type": "Short Answer",
+        "question": question,
+        "points": points,
+        "answer": answer,
+        "explanation": f'Reference: "{sentence[:60]}..."',
+    }
+
+def _generate_local_long_answer(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+    word = _pick_keyword(sentence)
+
+    q_map = {
+        "Basic": (f"[{points} mark] Write a short note on: {sentence[:80]}...", f"{word} is important. It helps explain the main point and gives context to the passage."),
+        "Intermediate": (f'[{points} mark] Describe the importance of "{word}" in: {sentence[:80]}...', f"{word} contributes greatly. It supports the argument and adds depth to the understanding of the topic. Without it, the passage would be incomplete."),
+        "Pro": (f'[{points} mark] Analyze the importance of "{word}" in: {sentence[:80]}...', f"{word} is a central concept. It influences multiple aspects of the passage by connecting ideas and strengthening arguments. Contextually, it appears in: \"{sentence[:70]}...\", which highlights its relevance."),
+    }
+    question, answer = q_map.get(difficulty, q_map["Basic"])
+
+    if answer_length in ("1-line", "2-line"):
+        answer = ". ".join(answer.split(". ")[:2]) + "."
+    if answer_length == "Essay":
+        answer += f" In summary, {word} is indispensable. Further study can reveal deeper insights about its role in the given context."
+
+    return {
+        "type": "Long Answer",
+        "question": question,
+        "points": points,
+        "answer": answer,
+        "explanation": f'Reference: "{sentence[:60]}..."',
+    }
+
+def _generate_local_essay(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+    word = _pick_keyword(sentence)
+
+    answer_map = {
+        "1-line": f"{word} is significant for the topic.",
+        "2-line": f"{word} is important in context. It contributes to the central theme.",
+        "default": (
+            f"{word} is a key concept that shapes the narrative. "
+            f"It contributes to the overall structure and supports the central theme. "
+            f'In the passage "{sentence[:70]}...", {word} appears as a significant element. '
+            f"An in-depth essay should cover its background, impact, and broader implications."
+        )
+    }
+    answer = answer_map.get(answer_length, answer_map["default"])
+
+    return {
+        "type": "Essay",
+        "question": f'[{points} mark] Essay: Discuss in detail the importance of "{word}" with reference to: {sentence[:80]}...',
+        "points": points,
+        "answer": answer,
+        "explanation": f'Reference: "{sentence[:60]}..."',
+    }
+
+
 def generate_quiz(
     text_content: str,
     num_questions: int = 10,
@@ -71,144 +186,29 @@ def generate_quiz(
     answer_length: str = "1-line",
 ) -> list[dict[str, typing.Any]]:
     sentences = re.split(r"[.!?]+", text_content)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 15][
-        : max(num_questions * 4, 40)
-    ]
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 15][: max(num_questions * 4, 40)]
     if not sentences:
         sentences = [text_content[:200]]
+
+    # Map question types to their generator functions
+    question_generators = {
+        "MCQ": _generate_local_mcq,
+        "Very Short Answer": _generate_local_vsa,
+        "Short Answer": _generate_local_short_answer,
+        "Long Answer": _generate_local_long_answer,
+        "Essay": _generate_local_essay,
+    }
+
+    generator_func = question_generators.get(question_type)
+    if not generator_func:
+        logger.warning(f"Unsupported local question type: {question_type}. Defaulting to MCQ.")
+        generator_func = _generate_local_mcq
 
     questions = []
     for idx in range(num_questions):
         sentence = _pick_sentences(sentences)[0]
-        word = _pick_keyword(sentence)
         points = idx + 1
-
-        q = {
-            "type": question_type,
-            "question": "",
-            "points": points,
-            "answer": "",
-            "explanation": f'Reference: "{sentence[:60]}..."',
-        }
-
-        if question_type == "MCQ":
-            qtxt, options, ci = _make_mcq(sentence, difficulty, answer_length, points)
-            q["question"] = qtxt
-            q["options"] = options
-            q["correct_index"] = ci
-            if answer_length == "1-line":
-                q["answer"] = word
-            elif answer_length == "2-line":
-                q["answer"] = (
-                    f"{word} – it is the key term identified in the given context."
-                )
-            elif answer_length == "Detailed":
-                q["answer"] = (
-                    f'{word} is the correct answer. It matches the context of: "{sentence[:60]}..." It carries significant meaning here.'
-                )
-            else:
-                q["answer"] = (
-                    f"{word} is the correct answer. "
-                    f'In the context of "{sentence[:70]}...", this term holds the most weight. '
-                    f"Option analysis shows it aligns with the passage better than distractors. "
-                    f"Therefore, {word} is selected based on contextual relevance."
-                )
-
-        elif question_type == "Very Short Answer":
-            if difficulty == "Basic":
-                q["question"] = f'[{points} mark] What is "{word}"?'
-                q["answer"] = word
-            elif difficulty == "Intermediate":
-                q["question"] = (
-                    f'[{points} mark] State the meaning of "{word}" from the text.'
-                )
-                q["answer"] = f"{word} refers to the key concept in the passage."
-            else:
-                q["question"] = (
-                    f'[{points} mark] Why is "{word}" significant in the passage?'
-                )
-                q["answer"] = (
-                    f"{word} is significant because it connects multiple ideas in the passage."
-                )
-            q["answer"] = (
-                q["answer"]
-                if answer_length == "1-line"
-                else (str(q["answer"]) + " " + sentence[:60] + "...")
-            )
-
-        elif question_type == "Short Answer":
-            if difficulty == "Basic":
-                q["question"] = f"[{points} mark] Explain briefly: {sentence[:80]}..."
-                q["answer"] = f"{word} is a key term that supports the main idea."
-            elif difficulty == "Intermediate":
-                q["question"] = (
-                    f'[{points} mark] Describe briefly how "{word}" affects the passage.'
-                )
-                q["answer"] = (
-                    f"{word} has a direct impact on the passage meaning. It helps readers understand the central theme better."
-                )
-            else:
-                q["question"] = (
-                    f'[{points} mark] Pro-level: Explain the role of "{word}" in this context with one example.'
-                )
-                q["answer"] = (
-                    f'{word} plays a key role by reinforcing the theme. For example, in the sentence "{sentence[:60]}...", it elevates the overall message.'
-                )
-            q["answer"] = (
-                q["answer"]
-                if answer_length != "Detailed"
-                else (str(q["answer"]) + " " + sentence[:60] + "...")
-            )
-
-        elif question_type == "Long Answer":
-            if difficulty == "Basic":
-                q["question"] = (
-                    f"[{points} mark] Write a short note on: {sentence[:80]}..."
-                )
-                q["answer"] = (
-                    f"{word} is important. It helps explain the main point and gives context to the passage."
-                )
-            elif difficulty == "Intermediate":
-                q["question"] = (
-                    f'[{points} mark] Describe the importance of "{word}" in: {sentence[:80]}...'
-                )
-                q["answer"] = (
-                    f"{word} contributes greatly. It supports the argument and adds depth to the understanding of the topic. Without it, the passage would be incomplete."
-                )
-            else:
-                q["question"] = (
-                    f'[{points} mark] Analyze the importance of "{word}" in: {sentence[:80]}...'
-                )
-                q["answer"] = (
-                    f"{word} is a central concept. "
-                    f"It influences multiple aspects of the passage by connecting ideas and strengthening arguments. "
-                    f'Contextually, it appears in: "{sentence[:70]}...", which highlights its relevance.'
-                )
-            if answer_length in ("1-line", "2-line"):
-                q["answer"] = ". ".join(str(q["answer"]).split(". ")[:2]) + "."
-            if answer_length == "Essay":
-                q["answer"] = str(q["answer"]) + (
-                    f" In summary, {word} is indispensable. "
-                    f"Further study can reveal deeper insights about its role in the given context."
-                )
-
-        elif question_type == "Essay":
-            q["question"] = (
-                f'[{points} mark] Essay: Discuss in detail the importance of "{word}" with reference to: {sentence[:80]}...'
-            )
-            q["answer"] = (
-                f"{word} is a key concept that shapes the narrative. "
-                f"It contributes to the overall structure and supports the central theme. "
-                f'In the passage "{sentence[:70]}...", {word} appears as a significant element. '
-                f"An in-depth essay should cover its background, impact, and broader implications."
-            )
-            if answer_length == "1-line":
-                q["answer"] = f"{word} is significant for the topic."
-            elif answer_length == "2-line":
-                q["answer"] = (
-                    f"{word} is important in context. It contributes to the central theme."
-                )
-
+        q = generator_func(sentence, difficulty, answer_length, points)
         questions.append(q)
 
     return questions[:num_questions]
@@ -319,17 +319,19 @@ def generate_ai_quiz(
                     .replace(" ", "_")
                     .replace("-", "_")
                 )
+                # Normalize AI output types to the application's standard types.
                 q_type_map = {
                     "mcq": "MCQ",
-                    "fill_in_blank": "fill_in_blank",
-                    "short_answer": "short_answer",
-                    "long_answer": "long_answer",
-                    "essay": "essay",
-                    "very_short_answer": "short_answer",
                     "multiple-choice": "MCQ",
-                    "veryshortanswer": "short_answer",
+                    "fill_in_blank": "Very Short Answer",
+                    "very_short_answer": "Very Short Answer",
+                    "veryshortanswer": "Very Short Answer",
+                    "short_answer": "Short Answer",
+                    "long_answer": "Long Answer",
+                    "essay": "Essay",
                 }
-                q_type = q_type_map.get(q_type_raw, "short_answer")
+                # Default to "Short Answer" if the type is unknown.
+                q_type = q_type_map.get(q_type_raw, "Short Answer")
 
                 question_text = (item.get("question") or "").strip()
                 answer_text = (item.get("answer") or "").strip()

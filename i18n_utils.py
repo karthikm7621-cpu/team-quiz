@@ -14,10 +14,11 @@ DEFAULT_LANGUAGE = "en"
 
 def load_translations():
     """Loads all translation files from the i18n directory."""
-    i18n_dir = Path(__file__).parent.parent / "i18n"
+    i18n_dir = Path(__file__).parent
     i18n.load_path.clear() # Clear default paths
-    i18n.load_path.append(i18n_dir)
+    i18n.load_path.append(str(i18n_dir))
     i18n.set("file_format", "yml")
+    i18n.set("filename_format", "{locale}.{format}")
 
 def set_language(lang_code: str = None):
     """Sets the application language based on selection or session state."""
@@ -30,7 +31,13 @@ def set_language(lang_code: str = None):
 
 def t(key: str, **kwargs) -> str:
     """Gets the translation for a given key."""
-    return i18n.t(key, **kwargs)
+    translated = i18n.t(key)
+    try:
+        if kwargs:
+            return translated.format(**kwargs)
+        return translated
+    except (KeyError, ValueError, AttributeError):
+        return translated
 
 # --- Initial Setup ---
 load_translations()

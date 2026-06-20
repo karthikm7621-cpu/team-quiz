@@ -2,8 +2,10 @@
 name = "team-quiz"
 version = "0.1.0"
 description = "A Streamlit app to generate quizzes from documents."
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
+    "Flask",
+    "google-adk",
     "streamlit",
     "pypdf",
     "PyYAML",
@@ -22,6 +24,12 @@ full = [
     "openpyxl",
     "pytesseract",
     "Pillow",
+]
+qna = [
+    "pymupdf4llm",
+    "sentence-transformers",
+    "faiss-cpu",
+    "llama-cpp-python",
 ]
 
 [build-system]

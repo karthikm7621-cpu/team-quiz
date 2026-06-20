@@ -1,5 +1,5 @@
-from .base import AIProvider
-from features.quiz_generator import generate_local_questions
+from base import AIProvider
+from quiz_generator import generate_quiz as generate_local_questions
 from typing import List, Dict, Any
 
 class LocalProvider(AIProvider):

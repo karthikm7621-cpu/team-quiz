@@ -3,6 +3,9 @@ en:
     title: "Team Quiz Generator"
     subtitle: "Upload any document or paste text to generate stunning quizzes"
     made_with: "Made with ❤️ using Streamlit"
+
+  language:
+    select: "Select Language"
   
   generator:
     question_type: "Question Type"
@@ -44,3 +47,14 @@ en:
     score_card_header: "🏆 Score: {score} / {max_score}"
     score_percentage: "{percentage}% correct"
     new_quiz_button: "🔄 Generate New Quiz"
+
+  qna:
+    mode_name: "Document Q&A"
+    upload_label: "Upload a document to ask questions about"
+    question_placeholder: "Ask a question about the document..."
+    ask_button: "Ask"
+    answer_header: "Answer"
+    spinner: "Thinking..."
+    error_no_document: "⚠️ Please upload a document first."
+    error_no_question: "⚠️ Please enter a question."
+    error_generation_failed: "❌ Could not generate an answer: {error}"
