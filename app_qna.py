@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import streamlit as st
@@ -39,7 +38,9 @@ if "doc_filename" not in st.session_state:
 # --- Sidebar for Document Upload ---
 with st.sidebar:
     st.header("1. Upload Document")
-    uploaded_file = st.file_uploader("Upload a PDF file", type="pdf", accept_multiple_files=False)
+    uploaded_file = st.file_uploader(
+        "Upload a PDF file", type="pdf", accept_multiple_files=False
+    )
 
     if uploaded_file:
         # Avoid reprocessing the same file
@@ -60,8 +61,12 @@ with st.sidebar:
                     st.error("Could not extract text from the PDF.")
                 else:
                     embedding_model = get_embedding_model()
-                    st.session_state.vector_store = create_vector_store(st.session_state.chunks, embedding_model)
-                    st.success(f"✅ Ready to answer questions about **{uploaded_file.name}**")
+                    st.session_state.vector_store = create_vector_store(
+                        st.session_state.chunks, embedding_model
+                    )
+                    st.success(
+                        f"✅ Ready to answer questions about **{uploaded_file.name}**"
+                    )
         else:
             st.info(f"✅ **{uploaded_file.name}** is already loaded.")
 
@@ -75,15 +80,25 @@ else:
     embedding_model = get_embedding_model()
     llm = get_llm()
 
-    question = st.text_input("Enter your question here:", placeholder="e.g., What are the main conclusions of the document?")
+    question = st.text_input(
+        "Enter your question here:",
+        placeholder="e.g., What are the main conclusions of the document?",
+    )
 
     if st.button("Ask"):
         if not question:
             st.error("Please enter a question.")
         elif llm is None:
-            st.error("The local LLM is not loaded. Please check the model path and configuration.")
+            st.error(
+                "The local LLM is not loaded. Please check the model path and configuration."
+            )
         else:
-            context = retrieve_context(question, st.session_state.vector_store, st.session_state.chunks, embedding_model)
+            context = retrieve_context(
+                question,
+                st.session_state.vector_store,
+                st.session_state.chunks,
+                embedding_model,
+            )
             answer = generate_answer(question, context, llm)
             st.subheader("Answer:")
             st.markdown(answer)

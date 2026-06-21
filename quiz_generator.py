@@ -4,11 +4,10 @@ import random
 import re
 import time
 import typing
+from ollama_provider import OllamaProvider
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-from ollama import OllamaProvider
 
 ALLOWED_QUESTION_TYPES = {
     "MCQ",
@@ -63,7 +62,9 @@ def _make_mcq(
     return question_text, options, correct_index
 
 
-def _generate_local_mcq(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+def _generate_local_mcq(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> dict:
     qtxt, options, ci = _make_mcq(sentence, difficulty, answer_length, points)
     word = options[ci]
 
@@ -76,7 +77,7 @@ def _generate_local_mcq(sentence: str, difficulty: str, answer_length: str, poin
             f'In the context of "{sentence[:70]}...", this term holds the most weight. '
             f"Option analysis shows it aligns with the passage better than distractors. "
             f"Therefore, {word} is selected based on contextual relevance."
-        )
+        ),
     }
 
     return {
@@ -89,13 +90,22 @@ def _generate_local_mcq(sentence: str, difficulty: str, answer_length: str, poin
         "explanation": f'Reference: "{sentence[:60]}..."',
     }
 
-def _generate_local_vsa(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+
+def _generate_local_vsa(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> dict:
     word = _pick_keyword(sentence)
 
     q_map = {
         "Basic": (f'[{points} mark] What is "{word}"?', word),
-        "Intermediate": (f'[{points} mark] State the meaning of "{word}" from the text.', f"{word} refers to the key concept in the passage."),
-        "Pro": (f'[{points} mark] Why is "{word}" significant in the passage?', f"{word} is significant because it connects multiple ideas in the passage."),
+        "Intermediate": (
+            f'[{points} mark] State the meaning of "{word}" from the text.',
+            f"{word} refers to the key concept in the passage.",
+        ),
+        "Pro": (
+            f'[{points} mark] Why is "{word}" significant in the passage?',
+            f"{word} is significant because it connects multiple ideas in the passage.",
+        ),
     }
     question, answer = q_map.get(difficulty, q_map["Basic"])
 
@@ -110,13 +120,25 @@ def _generate_local_vsa(sentence: str, difficulty: str, answer_length: str, poin
         "explanation": f'Reference: "{sentence[:60]}..."',
     }
 
-def _generate_local_short_answer(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+
+def _generate_local_short_answer(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> dict:
     word = _pick_keyword(sentence)
 
     q_map = {
-        "Basic": (f"[{points} mark] Explain briefly: {sentence[:80]}...", f"{word} is a key term that supports the main idea."),
-        "Intermediate": (f'[{points} mark] Describe briefly how "{word}" affects the passage.', f"{word} has a direct impact on the passage meaning. It helps readers understand the central theme better."),
-        "Pro": (f'[{points} mark] Pro-level: Explain the role of "{word}" in this context with one example.', f'{word} plays a key role by reinforcing the theme. For example, in the sentence "{sentence[:60]}...", it elevates the overall message.'),
+        "Basic": (
+            f"[{points} mark] Explain briefly: {sentence[:80]}...",
+            f"{word} is a key term that supports the main idea.",
+        ),
+        "Intermediate": (
+            f'[{points} mark] Describe briefly how "{word}" affects the passage.',
+            f"{word} has a direct impact on the passage meaning. It helps readers understand the central theme better.",
+        ),
+        "Pro": (
+            f'[{points} mark] Pro-level: Explain the role of "{word}" in this context with one example.',
+            f'{word} plays a key role by reinforcing the theme. For example, in the sentence "{sentence[:60]}...", it elevates the overall message.',
+        ),
     }
     question, answer = q_map.get(difficulty, q_map["Basic"])
 
@@ -131,13 +153,25 @@ def _generate_local_short_answer(sentence: str, difficulty: str, answer_length: 
         "explanation": f'Reference: "{sentence[:60]}..."',
     }
 
-def _generate_local_long_answer(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+
+def _generate_local_long_answer(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> dict:
     word = _pick_keyword(sentence)
 
     q_map = {
-        "Basic": (f"[{points} mark] Write a short note on: {sentence[:80]}...", f"{word} is important. It helps explain the main point and gives context to the passage."),
-        "Intermediate": (f'[{points} mark] Describe the importance of "{word}" in: {sentence[:80]}...', f"{word} contributes greatly. It supports the argument and adds depth to the understanding of the topic. Without it, the passage would be incomplete."),
-        "Pro": (f'[{points} mark] Analyze the importance of "{word}" in: {sentence[:80]}...', f"{word} is a central concept. It influences multiple aspects of the passage by connecting ideas and strengthening arguments. Contextually, it appears in: \"{sentence[:70]}...\", which highlights its relevance."),
+        "Basic": (
+            f"[{points} mark] Write a short note on: {sentence[:80]}...",
+            f"{word} is important. It helps explain the main point and gives context to the passage.",
+        ),
+        "Intermediate": (
+            f'[{points} mark] Describe the importance of "{word}" in: {sentence[:80]}...',
+            f"{word} contributes greatly. It supports the argument and adds depth to the understanding of the topic. Without it, the passage would be incomplete.",
+        ),
+        "Pro": (
+            f'[{points} mark] Analyze the importance of "{word}" in: {sentence[:80]}...',
+            f'{word} is a central concept. It influences multiple aspects of the passage by connecting ideas and strengthening arguments. Contextually, it appears in: "{sentence[:70]}...", which highlights its relevance.',
+        ),
     }
     question, answer = q_map.get(difficulty, q_map["Basic"])
 
@@ -154,7 +188,10 @@ def _generate_local_long_answer(sentence: str, difficulty: str, answer_length: s
         "explanation": f'Reference: "{sentence[:60]}..."',
     }
 
-def _generate_local_essay(sentence: str, difficulty: str, answer_length: str, points: int) -> dict:
+
+def _generate_local_essay(
+    sentence: str, difficulty: str, answer_length: str, points: int
+) -> dict:
     word = _pick_keyword(sentence)
 
     answer_map = {
@@ -165,7 +202,7 @@ def _generate_local_essay(sentence: str, difficulty: str, answer_length: str, po
             f"It contributes to the overall structure and supports the central theme. "
             f'In the passage "{sentence[:70]}...", {word} appears as a significant element. '
             f"An in-depth essay should cover its background, impact, and broader implications."
-        )
+        ),
     }
     answer = answer_map.get(answer_length, answer_map["default"])
 
@@ -186,7 +223,9 @@ def generate_quiz(
     answer_length: str = "1-line",
 ) -> list[dict[str, typing.Any]]:
     sentences = re.split(r"[.!?]+", text_content)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 15][: max(num_questions * 4, 40)]
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 15][
+        : max(num_questions * 4, 40)
+    ]
     if not sentences:
         sentences = [text_content[:200]]
 
@@ -201,7 +240,9 @@ def generate_quiz(
 
     generator_func = question_generators.get(question_type)
     if not generator_func:
-        logger.warning(f"Unsupported local question type: {question_type}. Defaulting to MCQ.")
+        logger.warning(
+            f"Unsupported local question type: {question_type}. Defaulting to MCQ."
+        )
         generator_func = _generate_local_mcq
 
     questions = []
@@ -227,11 +268,11 @@ def generate_ai_quiz(
 
     try:
         from google import genai
+        from google.genai import types as genai_types
         from google.api_core import exceptions as google_exceptions
-        from google.generativeai.types import GenerationConfig
     except ImportError:
         raise RuntimeError("AI mode requires google-genai. Install it and try again.")
-    
+
     client = genai.Client(api_key=api_key.strip())
 
     type_map = {
@@ -273,10 +314,10 @@ def generate_ai_quiz(
                 f"{text_content}"
             )
 
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = model.generate_content(
-                prompt,
-                generation_config=GenerationConfig(
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
                     response_mime_type="application/json",
                     max_output_tokens=MAX_OUTPUT_TOKENS,
                 ),

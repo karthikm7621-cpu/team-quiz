@@ -16,7 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "ruff",
+    "mypy",
+    "pip-audit",
+    "semgrep",
 ]
 full = [
     "python-docx",
@@ -35,3 +39,21 @@ qna = [
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.mypy]
+ignore_missing_imports = true
+exclude = [
+    '^venv/',
+    '^\.venv/',
+]
+
+[tool.coverage.run]
+omit = [
+    "app.py",
+    "main.py",
+    "app_qna.py",
+    "agent.py",
+    "flask_app.py",
+    "rag_workflow.py",
+    "tests/*",
+]

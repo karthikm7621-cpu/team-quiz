@@ -20,7 +20,7 @@ from rag_workflow import (
 from base import AIProvider
 from local import LocalProvider
 from gemini import GeminiProvider
-from ollama import OllamaProvider
+from ollama_provider import OllamaProvider
 
 
 # --- Page Config ---
@@ -31,6 +31,7 @@ def load_css():
     css_file = Path(__file__).parent / "style.css"
     with open(css_file) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 
 if "questions" not in st.session_state:
     st.session_state.questions = []
@@ -45,15 +46,15 @@ if "show_quiz" not in st.session_state:
 if "show_answers" not in st.session_state:
     st.session_state.show_answers = False
 if "question_type" not in st.session_state:
-    st.session_state.question_type = "MCQ" # Default value
+    st.session_state.question_type = "MCQ"  # Default value
 if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "Basic" # Default value
+    st.session_state.difficulty = "Basic"  # Default value
 if "answer_length" not in st.session_state:
-    st.session_state.answer_length = "1-line" # Default value
+    st.session_state.answer_length = "1-line"  # Default value
 if "provider_name" not in st.session_state:
-    st.session_state.provider_name = "Local" # Default provider
+    st.session_state.provider_name = "Local"  # Default provider
 if "api_key" not in st.session_state:
-    st.session_state.api_key = "" # For BYOK
+    st.session_state.api_key = ""  # For BYOK
 if "qna_chunks" not in st.session_state:
     st.session_state.qna_chunks = None
 if "qna_vector_store" not in st.session_state:
@@ -95,7 +96,9 @@ def render_quiz() -> None:
 
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown(f'<h2 class="title-gradient">🧠 {t("quiz.header")}</h2>', unsafe_allow_html=True)
+    st.markdown(
+        f'<h2 class="title-gradient">🧠 {t("quiz.header")}</h2>', unsafe_allow_html=True
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="question-card">', unsafe_allow_html=True)
@@ -207,7 +210,9 @@ def render_quiz() -> None:
     )
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if current_index > 0 and st.button(t("quiz.previous_button"), use_container_width=True):
+        if current_index > 0 and st.button(
+            t("quiz.previous_button"), use_container_width=True
+        ):
             st.session_state.current_index -= 1
             st.rerun()
     with col2:
@@ -217,7 +222,9 @@ def render_quiz() -> None:
             st.session_state.current_index += 1
             st.rerun()
     with col3:
-        if not submitted and st.button(t("quiz.submit_quiz_button"), use_container_width=True):
+        if not submitted and st.button(
+            t("quiz.submit_quiz_button"), use_container_width=True
+        ):
             unanswered = [
                 i + 1
                 for i, a in enumerate(user_answers)
@@ -230,7 +237,9 @@ def render_quiz() -> None:
                 st.rerun()
     with col4:
         if st.button(
-            t("quiz.show_answers_button") if not show_answers else t("quiz.hide_answers_button"),
+            t("quiz.show_answers_button")
+            if not show_answers
+            else t("quiz.hide_answers_button"),
             use_container_width=True,
         ):
             st.session_state.show_answers = not show_answers
@@ -347,8 +356,10 @@ def render_generator() -> None:
 
     # --- Provider Selection (BYOK and Ollama) ---
     provider_options = ["Local"]
-    if settings.GEMINI_API_KEY: provider_options.append("Gemini")
-    if settings.OLLAMA_HOST: provider_options.append("Ollama (Local)")
+    if settings.GEMINI_API_KEY:
+        provider_options.append("Gemini")
+    if settings.OLLAMA_HOST:
+        provider_options.append("Ollama (Local)")
     # ... add other providers like OpenAI, Anthropic here
 
     selected_provider = st.selectbox(t("generator.mode"), provider_options)
@@ -412,13 +423,15 @@ def render_generator() -> None:
             except ValueError:
                 st.error(t("generator.errors.unsupported_file"))
                 return
-        
+
         if not text_content.strip():
             text_content = text_input.strip()
 
         if not text_content.strip():
             if uploaded_file is not None:
-                st.warning(t("generator.errors.no_text_extracted", filename=uploaded_file.name))
+                st.warning(
+                    t("generator.errors.no_text_extracted", filename=uploaded_file.name)
+                )
             else:
                 st.warning(t("generator.errors.no_input"))
             return
@@ -458,7 +471,10 @@ def render_qna() -> None:
     """Renders the Document Q&A interface."""
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
     st.markdown('<div class="header-section">', unsafe_allow_html=True)
-    st.markdown(f'<h1 class="title-gradient">📄 {t("qna.mode_name")}</h1>', unsafe_allow_html=True)
+    st.markdown(
+        f'<h1 class="title-gradient">📄 {t("qna.mode_name")}</h1>',
+        unsafe_allow_html=True,
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     # The document upload is handled in the sidebar within main()
@@ -472,22 +488,29 @@ def render_qna() -> None:
         question = st.text_input(
             "qna_question",
             placeholder=t("qna.question_placeholder"),
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
 
         if st.button(t("qna.ask_button"), use_container_width=True, type="primary"):
             if not question:
                 st.error(t("qna.error_no_question"))
             elif llm is None:
-                st.error("The local LLM is not loaded. Please check the model path and configuration.")
+                st.error(
+                    "The local LLM is not loaded. Please check the model path and configuration."
+                )
             else:
                 with st.spinner(t("qna.spinner")):
-                    context = retrieve_context(question, st.session_state.qna_vector_store, st.session_state.qna_chunks, embedding_model)
+                    context = retrieve_context(
+                        question,
+                        st.session_state.qna_vector_store,
+                        st.session_state.qna_chunks,
+                        embedding_model,
+                    )
                     answer = generate_answer(question, context, llm)
-                
+
                 st.subheader(t("qna.answer_header"))
                 st.markdown(answer)
-    
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -497,30 +520,35 @@ def main():
 
     with st.sidebar:
         st.markdown("## Settings")
-        
+
         app_mode = st.radio(
-            "Mode",
-            options=["Quiz Generator", "Document Q&A"],
-            key="app_mode"
+            "Mode", options=["Quiz Generator", "Document Q&A"], key="app_mode"
         )
         st.markdown("---")
-        
+
         # Language Switcher
         lang_name = st.selectbox(
-            "Language", 
+            "Language",
             options=list(SUPPORTED_LANGUAGES.values()),
-            index=list(SUPPORTED_LANGUAGES.keys()).index(st.session_state.language)
+            index=list(SUPPORTED_LANGUAGES.keys()).index(st.session_state.language),
         )
-        lang_code = [code for code, name in SUPPORTED_LANGUAGES.items() if name == lang_name][0]
+        lang_code = [
+            code for code, name in SUPPORTED_LANGUAGES.items() if name == lang_name
+        ][0]
         if lang_code != st.session_state.language:
             set_language(lang_code)
             st.rerun()
-        
+
         # Conditional sidebar for Q&A
         if app_mode == "Document Q&A":
             st.markdown("---")
             st.header(t("qna.upload_label"))
-            uploaded_file = st.file_uploader("qna_uploader", type="pdf", accept_multiple_files=False, label_visibility="collapsed")
+            uploaded_file = st.file_uploader(
+                "qna_uploader",
+                type="pdf",
+                accept_multiple_files=False,
+                label_visibility="collapsed",
+            )
 
             if uploaded_file:
                 if uploaded_file.name != st.session_state.qna_doc_filename:
@@ -539,8 +567,12 @@ def main():
                             st.error("Could not extract text from the PDF.")
                         else:
                             embedding_model = get_embedding_model()
-                            st.session_state.qna_vector_store = create_vector_store(st.session_state.qna_chunks, embedding_model)
-                            st.success(f"✅ Ready to answer questions about **{uploaded_file.name}**")
+                            st.session_state.qna_vector_store = create_vector_store(
+                                st.session_state.qna_chunks, embedding_model
+                            )
+                            st.success(
+                                f"✅ Ready to answer questions about **{uploaded_file.name}**"
+                            )
                 else:
                     st.info(f"✅ **{uploaded_file.name}** is already loaded.")
 
@@ -551,6 +583,7 @@ def main():
             render_generator()
     elif app_mode == "Document Q&A":
         render_qna()
+
 
 if __name__ == "__main__":
     main()

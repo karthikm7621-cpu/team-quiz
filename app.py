@@ -1,14 +1,6 @@
 import streamlit as st
-import yaml
 import logging
-import typing
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# It's good practice to place imports of your own modules after standard libraries
-# This will resolve the user's ImportError if all files are in the same directory.
 from document_parser import extract_text_from_file, allowed_file, SUPPORTED_EXTENSIONS
 from quiz_generator import (
     generate_quiz,
@@ -18,9 +10,12 @@ from quiz_generator import (
     DIFFICULTY_LEVELS,
     ANSWER_LENGTHS,
 )
-
-# --- Internationalization (i18n) ---
 from i18n_utils import t as tr, set_language, SUPPORTED_LANGUAGES
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 # --- App State Initialization ---
 def initialize_state():
@@ -32,21 +27,24 @@ def initialize_state():
         st.session_state.quiz_submitted = False
         st.session_state.show_answers = False
 
+
 # --- UI Components ---
 def render_sidebar():
     """Renders the sidebar for configuration."""
     with st.sidebar:
         st.title(tr("app.title"))
-        
+
         # Language Selection
         st.markdown(tr("language.select"))
         cols = st.columns(len(SUPPORTED_LANGUAGES))
         for i, (lang_code, lang_name) in enumerate(SUPPORTED_LANGUAGES.items()):
-            if cols[i].button(lang_name, key=f"lang_{lang_code}", use_container_width=True):
+            if cols[i].button(
+                lang_name, key=f"lang_{lang_code}", use_container_width=True
+            ):
                 set_language(lang_code)
                 st.rerun()
 
-        st.markdown("---") # Visual separator
+        st.markdown("---")  # Visual separator
 
         st.markdown(tr("app.subtitle"))
 
@@ -78,9 +76,13 @@ def render_sidebar():
             label_visibility="collapsed",
             help=tr("generator.upload_help"),
         )
-        
+
         doc_lang_options = list(SUPPORTED_LANGUAGES.keys())
-        doc_lang = st.selectbox("Document Language", doc_lang_options, format_func=lambda x: SUPPORTED_LANGUAGES[x])
+        doc_lang = st.selectbox(
+            "Document Language",
+            doc_lang_options,
+            format_func=lambda x: SUPPORTED_LANGUAGES[x],
+        )
 
         text_content = st.text_area(
             "Text Content",
@@ -91,14 +93,29 @@ def render_sidebar():
 
         st.header("Quiz Configuration")
         num_questions = st.slider(tr("generator.num_questions"), 1, 50, 10)
-        question_type = st.selectbox(tr("generator.question_type"), list(ALLOWED_QUESTION_TYPES))
+        question_type = st.selectbox(
+            tr("generator.question_type"), list(ALLOWED_QUESTION_TYPES)
+        )
         difficulty = st.selectbox(tr("generator.difficulty"), list(DIFFICULTY_LEVELS))
-        answer_length = st.selectbox(tr("generator.answer_length"), list(ANSWER_LENGTHS))
+        answer_length = st.selectbox(
+            tr("generator.answer_length"), list(ANSWER_LENGTHS)
+        )
 
-        if st.button(tr("generator.generate_button"), use_container_width=True, type="primary"):
+        if st.button(
+            tr("generator.generate_button"), use_container_width=True, type="primary"
+        ):
             handle_quiz_generation(
-                mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length, doc_lang
+                mode,
+                api_key,
+                uploaded_file,
+                text_content,
+                num_questions,
+                question_type,
+                difficulty,
+                answer_length,
+                doc_lang,
             )
+
 
 def render_quiz():
     """Renders the interactive quiz questions and navigation."""
@@ -107,14 +124,16 @@ def render_quiz():
         return
 
     st.header(tr("quiz.header"))
-    
+
     # Display progress
     st.progress((st.session_state.current_question_index + 1) / len(quiz))
 
     q = quiz[st.session_state.current_question_index]
     index = st.session_state.current_question_index
 
-    st.subheader(f"{tr('quiz.question_prefix', index=index + 1)} ({tr('quiz.points_badge', points=q.get('points', 1))})")
+    st.subheader(
+        f"{tr('quiz.question_prefix', index=index + 1)} ({tr('quiz.points_badge', points=q.get('points', 1))})"
+    )
     st.markdown(q["question"])
 
     # Answer input
@@ -125,10 +144,8 @@ def render_quiz():
             "Options", options, key=f"q_{index}", label_visibility="collapsed"
         )
     else:
-        answer = st.text_area(
-            tr("quiz.type_answer_prompt"), key=f"q_{index}"
-        )
-    
+        answer = st.text_area(tr("quiz.type_answer_prompt"), key=f"q_{index}")
+
     if answer:
         st.session_state.user_answers[index] = answer
 
@@ -148,6 +165,7 @@ def render_quiz():
             st.session_state.quiz_submitted = True
             st.rerun()
 
+
 def render_scorecard():
     """Renders the final score and allows reviewing answers."""
     quiz = st.session_state.quiz
@@ -161,8 +179,11 @@ def render_scorecard():
         correct_ans = q.get("answer")
         if q["type"] == "MCQ":
             correct_ans = q["options"][q["correct_index"]]
-        
-        if user_ans and str(user_ans).strip().lower() == str(correct_ans).strip().lower():
+
+        if (
+            user_ans
+            and str(user_ans).strip().lower() == str(correct_ans).strip().lower()
+        ):
             score += q.get("points", 1)
 
     percentage = (score / max_score * 100) if max_score > 0 else 0
@@ -173,14 +194,20 @@ def render_scorecard():
 
     if st.session_state.show_answers:
         for i, q in enumerate(quiz):
-            with st.expander(f"{tr('quiz.question_prefix', index=i + 1)}: {q['question'][:50]}..."):
-                st.markdown(f"**{tr('quiz.your_answer')}:** {user_answers.get(i, 'Not Answered')}")
-                
+            with st.expander(
+                f"{tr('quiz.question_prefix', index=i + 1)}: {q['question'][:50]}..."
+            ):
+                st.markdown(
+                    f"**{tr('quiz.your_answer')}:** {user_answers.get(i, 'Not Answered')}"
+                )
+
                 correct_ans_display = q.get("answer")
                 if q["type"] == "MCQ":
                     correct_ans_display = q["options"][q["correct_index"]]
 
-                st.markdown(f"**{tr('quiz.correct_answer_label')}** {correct_ans_display}")
+                st.markdown(
+                    f"**{tr('quiz.correct_answer_label')}** {correct_ans_display}"
+                )
                 if "explanation" in q:
                     st.info(tr("quiz.explanation_label", explanation=q["explanation"]))
 
@@ -190,8 +217,19 @@ def render_scorecard():
             del st.session_state[key]
         st.rerun()
 
+
 # --- Logic ---
-def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_questions, question_type, difficulty, answer_length, doc_lang):
+def handle_quiz_generation(
+    mode,
+    api_key,
+    uploaded_file,
+    text_content,
+    num_questions,
+    question_type,
+    difficulty,
+    answer_length,
+    doc_lang,
+):
     """Processes inputs and calls the correct quiz generation function."""
     content = ""
     filename = ""
@@ -222,18 +260,34 @@ def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_quest
         try:
             quiz_data = None
             if mode == "Local":
-                quiz_data = generate_quiz(content, num_questions, question_type, difficulty, answer_length)
+                quiz_data = generate_quiz(
+                    content, num_questions, question_type, difficulty, answer_length
+                )
             elif mode == "AI (Gemini)":
                 if not api_key:
                     st.error("Google API key is required for AI mode.")
                     return
-                quiz_data = generate_ai_quiz(content, num_questions, question_type, difficulty, answer_length, api_key)
+                quiz_data = generate_ai_quiz(
+                    content,
+                    num_questions,
+                    question_type,
+                    difficulty,
+                    answer_length,
+                    api_key,
+                )
             elif mode == "Ollama":
                 # Assuming default model, can be made configurable
-                quiz_data = generate_ollama_quiz(content, num_questions, question_type, difficulty, answer_length)
+                quiz_data = generate_ollama_quiz(
+                    content, num_questions, question_type, difficulty, answer_length
+                )
 
             if not quiz_data:
-                st.error(tr("generator.errors.generation_failed", error="No questions were generated."))
+                st.error(
+                    tr(
+                        "generator.errors.generation_failed",
+                        error="No questions were generated.",
+                    )
+                )
                 return
 
             # Reset state and store new quiz
@@ -247,11 +301,12 @@ def handle_quiz_generation(mode, api_key, uploaded_file, text_content, num_quest
             st.error(tr("generator.errors.generation_failed", error=str(e)))
             logger.error(f"Quiz generation failed: {e}", exc_info=True)
 
+
 # --- Main App ---
 def main():
     """Main function to run the Streamlit app."""
     st.set_page_config(page_title=tr("app.title"), layout="wide")
-    
+
     initialize_state()
     render_sidebar()
 
@@ -261,8 +316,13 @@ def main():
         else:
             render_quiz()
     else:
-        st.info("👋 Welcome! Configure your quiz in the sidebar and click 'Generate Quiz' to start.")
-        st.markdown(f"<div style='text-align: center; margin-top: 20px;'>{tr('app.made_with')}</div>", unsafe_allow_html=True)
+        st.info(
+            "👋 Welcome! Configure your quiz in the sidebar and click 'Generate Quiz' to start."
+        )
+        st.markdown(
+            f"<div style='text-align: center; margin-top: 20px;'>{tr('app.made_with')}</div>",
+            unsafe_allow_html=True,
+        )
 
 
 if __name__ == "__main__":

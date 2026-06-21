@@ -20,7 +20,9 @@ def extract_text_chunks(file_path: Path) -> list[str]:
         chunks = md_text.split("\n\n")
 
         # Clean up and filter chunks for meaningful content
-        processed_chunks = [chunk.strip() for chunk in chunks if len(chunk.strip()) > 100]
+        processed_chunks = [
+            chunk.strip() for chunk in chunks if len(chunk.strip()) > 100
+        ]
         if not processed_chunks:
             # Fallback for documents without many double newlines
             return [md_text]
@@ -43,7 +45,9 @@ def create_vector_store(chunks: list[str], model):
     if not chunks:
         return None
     with st.spinner("Creating embeddings for the document..."):
-        embeddings = model.encode(chunks, convert_to_tensor=False, show_progress_bar=True)
+        embeddings = model.encode(
+            chunks, convert_to_tensor=False, show_progress_bar=True
+        )
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(np.array(embeddings).astype("float32"))
@@ -70,7 +74,9 @@ def get_llm():
     # 1. Download a GGUF model (e.g., from https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF)
     # 2. Place it in a directory (e.g., 'models/')
     # 3. Update the 'model_path' below or set the `LOCAL_LLM_PATH` environment variable.
-    model_path_str = os.getenv("LOCAL_LLM_PATH", "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+    model_path_str = os.getenv(
+        "LOCAL_LLM_PATH", "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+    )
     model_path = Path(model_path_str)
 
     if not model_path.exists():
@@ -82,10 +88,14 @@ def get_llm():
 
     try:
         # Offload all layers to GPU if available
-        llm = Llama(model_path=str(model_path), n_ctx=4096, n_gpu_layers=-1, verbose=False)
+        llm = Llama(
+            model_path=str(model_path), n_ctx=4096, n_gpu_layers=-1, verbose=False
+        )
         return llm
     except Exception as e:
-        st.error(f"Failed to load LLM. Ensure `llama-cpp-python` is installed correctly for your system.\nError: {e}")
+        st.error(
+            f"Failed to load LLM. Ensure `llama-cpp-python` is installed correctly for your system.\nError: {e}"
+        )
         return None
 
 
