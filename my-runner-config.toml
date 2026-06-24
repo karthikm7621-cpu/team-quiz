@@ -1,0 +1,13 @@
+concurrent = 1
+check_interval = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "Karthik-windows-runner-fixed"
+  url = "https://code.swecha.org/"
+  id = 498
+  token = "glrt-gZK7qummfT5JuxphR6vf9286MQpwOjFodWoKdDozCnU6Mjd0ahU.01.1f1gmrn70"
+  executor = "shell"
+  shell = "powershell"
