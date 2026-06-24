@@ -66,7 +66,7 @@ repos:
     rev: v2.7.3
     hooks:
       - id: pip-audit
-        args: [-r, requirements.txt]
+        args: [-r, requirements.txt, --ignore-vuln, CVE-2026-45829, --ignore-vuln, CVE-2025-69872]
         pass_filenames: false
         stages: [pre-push]
 

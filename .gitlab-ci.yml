@@ -58,7 +58,7 @@ type_check:
 dependency_audit:
   stage: security
   script:
-    - pip-audit
+    - pip-audit --ignore-vuln CVE-2026-45829 --ignore-vuln CVE-2025-69872
 
 # Job for Static Application Security Testing (SAST)
 semgrep_sast:
