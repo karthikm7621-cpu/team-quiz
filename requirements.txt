@@ -1,0 +1,8 @@
+Flask
+google-adk
+streamlit
+pypdf
+PyYAML
+google-generativeai
+ollama
+python-i18n
